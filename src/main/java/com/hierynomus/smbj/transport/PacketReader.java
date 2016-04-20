@@ -25,6 +25,7 @@ import com.hierynomus.smbj.smb2.messages.SMB2ResponseMessageFactory;
 import java.io.EOFException;
 import java.io.IOException;
 import java.io.InputStream;
+import java.util.List;
 import java.util.concurrent.locks.ReentrantLock;
 
 public class PacketReader {
@@ -39,13 +40,15 @@ public class PacketReader {
         this.sequenceWindow = sequenceWindow;
     }
 
-    public SMB2Packet readPacket() throws TransportException {
+    public List<SMB2Packet> readPacket() throws TransportException {
         lock.lock();
         try {
-            SMB2Packet smb2Packet = _readTcpPacket();
-            // Grant the credits from the response.
-            sequenceWindow.creditsGranted(smb2Packet.getHeader().getCreditResponse());
-            return smb2Packet;
+            List<SMB2Packet> smb2Packets = _readTcpPacket();
+            for (SMB2Packet packet : smb2Packets) {
+                // Grant the credits from the response.
+                sequenceWindow.creditsGranted(packet.getHeader().getCreditResponse());
+            }
+            return smb2Packets;
         } catch (IOException | Buffer.BufferException e) {
             throw new TransportException(e);
         } finally {
@@ -53,7 +56,7 @@ public class PacketReader {
         }
     }
 
-    private SMB2Packet _readTcpPacket() throws IOException, Buffer.BufferException {
+    private List<SMB2Packet> _readTcpPacket() throws IOException, Buffer.BufferException {
         byte[] tcpHeader = new byte[4];
         in.read(tcpHeader);
         Buffer.PlainBuffer plainBuffer = new Buffer.PlainBuffer(tcpHeader, Endian.BE);
@@ -62,7 +65,7 @@ public class PacketReader {
         return _readSMB2Packet(packetLength);
     }
 
-    private SMB2Packet _readSMB2Packet(int packetLength) throws IOException, Buffer.BufferException {
+    private List<SMB2Packet> _readSMB2Packet(int packetLength) throws IOException, Buffer.BufferException {
         byte[] smb2Packet = new byte[packetLength];
         int numReadSoFar = 0;
         while (numReadSoFar < packetLength) {

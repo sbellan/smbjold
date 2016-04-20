@@ -42,4 +42,13 @@ public interface TransportLayer {
      * @return The sequence number of the packet.
      */
     long write(SMB2Packet packet) throws TransportException;
+
+    /**
+     * Send the packets as compounded requests
+     * MS-SMB2 3.2.4.1.4 Sending Compounded Requests
+     * @param packets
+     * @throws TransportException
+     */
+    void writeRequests(boolean related, SMB2Packet... packets) throws TransportException;
+
 }

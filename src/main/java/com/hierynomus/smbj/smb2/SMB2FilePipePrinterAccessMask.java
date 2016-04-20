@@ -18,15 +18,15 @@ package com.hierynomus.smbj.smb2;
 import com.hierynomus.protocol.commons.EnumWithValue;
 
 /**
- * SMB2 2.2.13.1.2 - Create - Access Mask Encoding - Directory Access Mask Encoding
+ * SMB2 2.2.13.1.1 - Create - Access Mask Encoding - File/Pipe/Printer  Access Mask Encoding
  */
-public enum SMB2DirectoryAccessMask implements EnumWithValue<SMB2DirectoryAccessMask> {
-    FILE_LIST_DIRECTORY(0x00000001L),
-    FILE_ADD_FILE(0x00000002L),
-    FILE_ADD_SUBDIRECTORY(0x00000004L),
+public enum SMB2FilePipePrinterAccessMask implements EnumWithValue<SMB2FilePipePrinterAccessMask> {
+    FILE_READ_DATA(0x00000001L),
+    FILE_WRITE_DATA(0x00000002L),
+    FILE_APPEND_DATA(0x00000004L),
     FILE_READ_EA(0x00000008L),
     FILE_WRITE_EA(0x00000010L),
-    FILE_TRAVERSE(0x00000020L),
+    FILE_EXECUTE(0x00000020L),
     FILE_DELETE_CHILD(0x00000040L),
     FILE_READ_ATTRIBUTES(0x00000080L),
     FILE_WRITE_ATTRIBUTES(0x00000100L),
@@ -46,7 +46,7 @@ public enum SMB2DirectoryAccessMask implements EnumWithValue<SMB2DirectoryAccess
 
     private long value;
 
-    SMB2DirectoryAccessMask(long value) {
+    SMB2FilePipePrinterAccessMask(long value) {
         this.value = value;
     }
 

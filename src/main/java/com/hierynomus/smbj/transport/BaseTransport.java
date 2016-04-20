@@ -16,6 +16,7 @@
 package com.hierynomus.smbj.transport;
 
 import com.hierynomus.smbj.common.SMBBuffer;
+import com.hierynomus.smbj.smb2.SMB2MessageFlag;
 import com.hierynomus.smbj.smb2.SMB2Packet;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -56,6 +57,55 @@ public abstract class BaseTransport implements TransportLayer {
         } finally {
             writeLock.unlock();
         }
+    }
+
+    @Override
+    public void writeRequests(boolean related, SMB2Packet... packets) throws TransportException {
+        if (packets.length < 2) {
+            throw new IllegalArgumentException("More than 1 request expected for compounding");
+        }
+        writeLock.lock();
+        try {
+            try {
+                SMBBuffer buffer = new SMBBuffer();
+                SMB2Packet first = packets[0];
+                int packetSize = packetSize(first);
+                // Align to 8 byte boundary
+                int alignmentFill = (8 - packetSize % 8) % 8;
+                first.getHeader().setNextCommandOffset(packetSize + alignmentFill);
+                first.write(buffer);
+                buffer.putRawBytes(new byte[alignmentFill]);
+
+                for (int i = 1; i < packets.length; i++) {
+                    if (related) {
+                        packets[i].getHeader().setFlag(SMB2MessageFlag.SMB2_FLAGS_RELATED_OPERATIONS);
+                        packets[i].getHeader().setSessionId(0xFFFFFFFFFFFFFFFFl);
+                        packets[i].getHeader().setTreeId(0xFFFFFFFFl);
+                    }
+                    packetSize = packetSize(packets[i]);
+                    alignmentFill = (8 - packetSize % 8) % 8;
+                    packets[i].getHeader().setNextCommandOffset(packetSize + alignmentFill);
+                    packets[i].write(buffer);
+                    buffer.putRawBytes(new byte[alignmentFill]);
+                }
+                logger.trace("Writing {} packets", packets.length);
+                doWrite(buffer);
+                out.flush();
+            } catch (IOException ioe) {
+                throw new TransportException(ioe);
+            }
+        } finally {
+            writeLock.unlock();
+        }
+    }
+
+    private int packetSize(SMB2Packet first) {
+        // Write the packet to a temporary buffer so that
+        // we can figure out the size of the packet
+        // TODO figure out if there is a better way
+        SMBBuffer buffer = new SMBBuffer();
+        first.write(buffer);
+        return buffer.wpos();
     }
 
     protected abstract void doWrite(SMBBuffer packetData) throws IOException;

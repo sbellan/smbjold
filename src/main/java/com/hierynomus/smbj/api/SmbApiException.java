@@ -13,20 +13,17 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.hierynomus.smbj;
+package com.hierynomus.smbj.api;
 
-import com.hierynomus.smbj.smb2.SMB2Dialect;
+import com.hierynomus.smbj.smb2.SMB2StatusCode;
 
-import java.util.EnumSet;
+public class SmbApiException extends Exception {
 
-public class DefaultConfig implements Config {
-    @Override
-    public EnumSet<SMB2Dialect> getSupportedDialects() {
-        return EnumSet.of(SMB2Dialect.SMB_2_0_2);
-    }
 
-    @Override
-    public boolean isUseOffsetForEmptyNames() {
-        return false;
+    private final SMB2StatusCode statusCode;
+
+    public SmbApiException(SMB2StatusCode statusCode, String message, Throwable cause) {
+        super(statusCode + "-" + message, cause);
+        this.statusCode = statusCode;
     }
 }

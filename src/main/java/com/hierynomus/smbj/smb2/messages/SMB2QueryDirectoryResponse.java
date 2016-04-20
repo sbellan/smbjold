@@ -82,7 +82,6 @@ public class SMB2QueryDirectoryResponse extends SMB2Packet {
             buffer.readUInt16(); // Reserved2
             fileId = buffer.readRawBytes(8);
             fileName = buffer.readString(NtlmFunctions.UNICODE, (int)fileNameLen/2);
-            System.out.println(fileName);
             _fileInfoList.add(new FileInfo(fileName, fileId, fileAttributes, fileSize));
             offsetStart += nextEntryOffset;
             buffer.rpos(offsetStart);

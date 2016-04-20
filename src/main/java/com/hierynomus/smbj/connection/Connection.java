@@ -35,6 +35,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.util.List;
 
 /**
  * A connection to a server.
@@ -57,7 +58,7 @@ public class Connection extends SocketClient implements AutoCloseable {
         logger.info("Negotiating dialects {} with server {}", config.getSupportedDialects(), getRemoteHostname());
         SMB2Packet negotiatePacket = new SMB2NegotiateRequest(config.getSupportedDialects(), connectionInfo.getClientGuid());
         send(negotiatePacket);
-        SMB2Packet negotiateResponse = new PacketReader(getInputStream(), connectionInfo.getSequenceWindow()).readPacket();
+        SMB2Packet negotiateResponse = new PacketReader(getInputStream(), connectionInfo.getSequenceWindow()).readPacket().get(0);
         if (!(negotiateResponse instanceof SMB2NegotiateResponse)) {
             throw new IllegalStateException("Expected a SMB2 NEGOTIATE Response, but got: " + negotiateResponse.getHeader().getMessageId());
         }
@@ -89,7 +90,14 @@ public class Connection extends SocketClient implements AutoCloseable {
         return transport.write(packet);
     }
 
-    public SMB2Packet receive() throws TransportException {
+    public void sendRelatedRequests(boolean related, SMB2Packet... packets) throws TransportException {
+        for (int i = 0; i < packets.length; i++) {
+            packets[i].getHeader().setMessageId(connectionInfo.getSequenceWindow().get());
+        }
+        transport.writeRequests(related, packets);
+    }
+
+    public List<SMB2Packet> receive() throws TransportException {
         return packetReader.readPacket();
     }
 
@@ -121,5 +129,9 @@ public class Connection extends SocketClient implements AutoCloseable {
      */
     public SMB2Dialect getNegotiatedDialect() {
         return connectionInfo.getDialect();
+    }
+
+    public Config getConfig() {
+        return config;
     }
 }

@@ -73,7 +73,7 @@ public class NtlmAuthenticator implements Authenticator {
             byte[] asn1 = negTokenInit(ntlmNegotiate);
             smb2SessionSetup.setSecurityBuffer(asn1);
             connection.send(smb2SessionSetup);
-            SMB2SessionSetup receive = (SMB2SessionSetup) connection.receive();
+            SMB2SessionSetup receive = (SMB2SessionSetup) connection.receive().get(0);
             long sessionId = receive.getHeader().getSessionId();
             if (receive.getHeader().getStatus() == SMB2StatusCode.STATUS_MORE_PROCESSING_REQUIRED) {
                 logger.debug("More processing required for authentication of {}", context.getUsername());
@@ -124,7 +124,7 @@ public class NtlmAuthenticator implements Authenticator {
                 asn1 = negTokenTarg(resp, negTokenTarg.getResponseToken());
                 smb2SessionSetup2.setSecurityBuffer(asn1);
                 connection.send(smb2SessionSetup2);
-                SMB2SessionSetup setupResponse = (SMB2SessionSetup) connection.receive();
+                SMB2SessionSetup setupResponse = (SMB2SessionSetup) connection.receive().get(0);
                 if (setupResponse.getHeader().getStatus() != SMB2StatusCode.STATUS_SUCCESS) {
                     throw new NtlmException("Setup failed with " + setupResponse.getHeader().getStatus());
                 }

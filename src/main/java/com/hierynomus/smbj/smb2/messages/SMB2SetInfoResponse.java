@@ -13,20 +13,23 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.hierynomus.smbj;
+package com.hierynomus.smbj.smb2.messages;
 
-import com.hierynomus.smbj.smb2.SMB2Dialect;
+import com.hierynomus.protocol.commons.buffer.Buffer;
+import com.hierynomus.smbj.common.SMBBuffer;
+import com.hierynomus.smbj.smb2.SMB2Packet;
 
-import java.util.EnumSet;
+/**
+ * [MS-SMB2].pdf 2.2.7 SMB2 Logoff Request / 2.2.8 SMB Logoff Response
+ */
+public class SMB2SetInfoResponse extends SMB2Packet {
 
-public class DefaultConfig implements Config {
-    @Override
-    public EnumSet<SMB2Dialect> getSupportedDialects() {
-        return EnumSet.of(SMB2Dialect.SMB_2_0_2);
+    public SMB2SetInfoResponse() {
+        super();
     }
 
     @Override
-    public boolean isUseOffsetForEmptyNames() {
-        return false;
+    protected void readMessage(SMBBuffer buffer) throws Buffer.BufferException {
+        buffer.skip(2); // StructureSize (2 bytes)
     }
 }

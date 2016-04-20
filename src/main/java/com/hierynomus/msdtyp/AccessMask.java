@@ -13,24 +13,14 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.hierynomus.smbj.smb2;
+package com.hierynomus.msdtyp;
 
 import com.hierynomus.protocol.commons.EnumWithValue;
 
 /**
- * SMB2 2.2.13.1.2 - Create - Access Mask Encoding - Directory Access Mask Encoding
+ * MS-DTYP 2.4.3 ACCESS_MASK
  */
-public enum SMB2DirectoryAccessMask implements EnumWithValue<SMB2DirectoryAccessMask> {
-    FILE_LIST_DIRECTORY(0x00000001L),
-    FILE_ADD_FILE(0x00000002L),
-    FILE_ADD_SUBDIRECTORY(0x00000004L),
-    FILE_READ_EA(0x00000008L),
-    FILE_WRITE_EA(0x00000010L),
-    FILE_TRAVERSE(0x00000020L),
-    FILE_DELETE_CHILD(0x00000040L),
-    FILE_READ_ATTRIBUTES(0x00000080L),
-    FILE_WRITE_ATTRIBUTES(0x00000100L),
-
+public enum AccessMask implements EnumWithValue<AccessMask> {
     DELETE(0x00010000L),
     READ_CONTROL(0x00020000L),
     WRITE_DAC(0x00040000L),
@@ -41,12 +31,22 @@ public enum SMB2DirectoryAccessMask implements EnumWithValue<SMB2DirectoryAccess
     GENERIC_ALL(0x10000000L),
     GENERIC_EXECUTE(0x20000000L),
     GENERIC_WRITE(0x40000000L),
-    GENERIC_READ(0x80000000L);
+    GENERIC_READ(0x80000000L),
+
+    // Object Access Mask
+    ADS_RIGHT_DS_CONTROL_ACCESS(0X00000100L),
+    ADS_RIGHT_DS_CREATE_CHILD(0X00000001L),
+    ADS_RIGHT_DS_DELETE_CHILD(0X00000002L),
+    ADS_RIGHT_DS_READ_PROP(0x00000010L),
+    ADS_RIGHT_DS_WRITE_PROP(0x00000020L),
+    ADS_RIGHT_DS_SELF(0x00000008)
+
+    ;
 
 
     private long value;
 
-    SMB2DirectoryAccessMask(long value) {
+    AccessMask(long value) {
         this.value = value;
     }
 

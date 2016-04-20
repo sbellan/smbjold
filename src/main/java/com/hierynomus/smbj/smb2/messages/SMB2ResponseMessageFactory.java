@@ -22,42 +22,72 @@ import com.hierynomus.smbj.smb2.SMB2MessageCommandCode;
 import com.hierynomus.smbj.smb2.SMB2Packet;
 import com.hierynomus.smbj.transport.TransportException;
 
+import java.util.ArrayList;
+import java.util.List;
+
 public class SMB2ResponseMessageFactory {
 
-    public static SMB2Packet read(SMBBuffer buffer) throws Buffer.BufferException, TransportException {
-        // Check we see a valid header start
-        Check.ensureEquals(buffer.readRawBytes(4), new byte[] {(byte) 0xFE, 'S', 'M', 'B'}, "Could not find SMB2 Packet header");
-        // Skip until Command
-        buffer.skip(8);
-        SMB2MessageCommandCode command = SMB2MessageCommandCode.lookup(buffer.readUInt16());
-        // Reset read position so that the message works.
-        buffer.rpos(0);
-        switch (command) {
-            case SMB2_NEGOTIATE: // SMB2_NEGOTIATE
-                return new SMB2NegotiateResponse().read(buffer);
-            case SMB2_SESSION_SETUP: // SMB2_SESSION_SETUP
-                return new SMB2SessionSetup().read(buffer);
-            case SMB2_TREE_CONNECT: // TREE_CONNECT_RESPONSE
-                return new SMB2TreeConnectResponse().read(buffer);
-            case SMB2_TREE_DISCONNECT: // TREE_DISCONNECT_RESPONSE
-                return new SMB2TreeDisconnectResponse().read(buffer);
-            case SMB2_LOGOFF: // SESSION_LOGOFF
-                return new SMB2LogoffResponse().read(buffer);
-            case SMB2_CREATE: // CREATE_RESPONSE
-                return new SMB2CreateResponse().read(buffer);
-            case SMB2_CHANGE_NOTIFY: // CHANGE_NOTIFY_RESPONSE
-                return new SMB2ChangeNotifyResponse().read(buffer);
-            case SMB2_QUERY_DIRECTORY: // QUERY_RESPONSE
-                return new SMB2QueryDirectoryResponse().read(buffer);
-            case SMB2_ECHO: // ECHO_RESPONSE
-                return new SMB2EchoResponse().read(buffer);
-            case SMB2_READ: // READ_RESPONSE
-                return new SMB2ReadResponse().read(buffer);
-            case SMB2_CLOSE: // READ_RESPONSE
-                return new SMB2Close().read(buffer);
-            default:
-                throw new TransportException("Unknown SMB2 Message Command type: " + command);
+    public static List<SMB2Packet> read(SMBBuffer buffer) throws Buffer.BufferException, TransportException {
+        List<SMB2Packet> packets = new ArrayList<>();
+        SMB2Packet packet = null;
+        int nextCommandOffset = 0;
+        do {
+            buffer.rpos(nextCommandOffset);
+            // Check we see a valid header start
+            Check.ensureEquals(buffer.readRawBytes(4), new byte[] {(byte) 0xFE, 'S', 'M', 'B'}, "Could not find SMB2 Packet header");
+            // Skip until Command
+            buffer.skip(8);
+            SMB2MessageCommandCode command = SMB2MessageCommandCode.lookup(buffer.readUInt16());
+            // Reset read position so that the message works.
+            buffer.rpos(nextCommandOffset);
+            switch (command) {
+                case SMB2_NEGOTIATE: // SMB2_NEGOTIATE
+                    packet = new SMB2NegotiateResponse().read(buffer);
+                    break;
+                case SMB2_SESSION_SETUP: // SMB2_SESSION_SETUP
+                    packet = new SMB2SessionSetup().read(buffer);
+                    break;
+                case SMB2_TREE_CONNECT: // TREE_CONNECT_RESPONSE
+                    packet = new SMB2TreeConnectResponse().read(buffer);
+                    break;
+                case SMB2_TREE_DISCONNECT: // TREE_DISCONNECT_RESPONSE
+                    packet = new SMB2TreeDisconnectResponse().read(buffer);
+                    break;
+                case SMB2_LOGOFF: // SESSION_LOGOFF
+                    packet = new SMB2LogoffResponse().read(buffer);
+                    break;
+                case SMB2_CREATE: // CREATE_RESPONSE
+                    packet = new SMB2CreateResponse().read(buffer);
+                    break;
+                case SMB2_CHANGE_NOTIFY: // CHANGE_NOTIFY_RESPONSE
+                    packet = new SMB2ChangeNotifyResponse().read(buffer);
+                    break;
+                case SMB2_QUERY_DIRECTORY: // QUERY_RESPONSE
+                    packet = new SMB2QueryDirectoryResponse().read(buffer);
+                    break;
+                case SMB2_ECHO: // ECHO_RESPONSE
+                    packet = new SMB2EchoResponse().read(buffer);
+                    break;
+                case SMB2_READ: // READ_RESPONSE
+                    packet = new SMB2ReadResponse().read(buffer);
+                    break;
+                case SMB2_CLOSE: // READ_RESPONSE
+                    packet = new SMB2Close().read(buffer);
+                    break;
+                case SMB2_WRITE: // WRITE_RESPONSE
+                    packet = new SMB2WriteResponse().read(buffer);
+                    break;
+                case SMB2_SET_INFO: // SET_INFO
+                    packet = new SMB2SetInfoResponse().read(buffer);
+                    break;
+                default:
+                    throw new TransportException("Unknown SMB2 Message Command type: " + command);
 
-        }
+            }
+            packets.add(packet);
+            nextCommandOffset += (int) packet.getHeader().getNextCommandOffset();
+        } while (packet.getHeader().getNextCommandOffset() != 0);
+
+        return packets;
     }
 }
