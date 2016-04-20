@@ -20,10 +20,20 @@ import com.hierynomus.smbj.smb2.SMB2StatusCode;
 public class SmbApiException extends Exception {
 
 
-    private final SMB2StatusCode statusCode;
+    private final SMB2StatusCode status;
+    long statusCode; // For cases where the statusCode is not defined yet.
 
-    public SmbApiException(SMB2StatusCode statusCode, String message, Throwable cause) {
-        super(statusCode + "-" + message, cause);
+    public SmbApiException(SMB2StatusCode status, long statusCode, String message, Throwable cause) {
+        super(status + "/" + Long.toHexString(statusCode) + " - " + message, cause);
         this.statusCode = statusCode;
+        this.status = status;
+    }
+
+    public SMB2StatusCode getStatusCode() {
+        return status;
+    }
+
+    public long getStatus() {
+        return statusCode;
     }
 }

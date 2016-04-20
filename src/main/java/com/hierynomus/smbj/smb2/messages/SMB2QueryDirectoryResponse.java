@@ -24,6 +24,7 @@ import com.hierynomus.smbj.common.SMBBuffer;
 import com.hierynomus.smbj.smb2.SMB2Packet;
 import com.hierynomus.smbj.smb2.SMB2StatusCode;
 
+import java.text.DecimalFormat;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
@@ -82,7 +83,9 @@ public class SMB2QueryDirectoryResponse extends SMB2Packet {
             buffer.readUInt16(); // Reserved2
             fileId = buffer.readRawBytes(8);
             fileName = buffer.readString(NtlmFunctions.UNICODE, (int)fileNameLen/2);
-            _fileInfoList.add(new FileInfo(fileName, fileId, fileAttributes, fileSize));
+            if (!(".".equals(fileName) || "..".equals(fileName))) {
+                _fileInfoList.add(new FileInfo(fileName, fileId, fileAttributes, fileSize));
+            }
             offsetStart += nextEntryOffset;
             buffer.rpos(offsetStart);
         }
@@ -126,6 +129,28 @@ public class SMB2QueryDirectoryResponse extends SMB2Packet {
                     "fileSize='" + fileSize + '\'' +
                     ", fileAttributes=" + EnumWithValue.EnumUtils.toEnumSet(fileAttributes, FileAttributes.class) +
                     '}';
+        }
+
+    }
+
+    public static class FileInfoFormatter {
+        public static void print(List<FileInfo> fileInfos) {
+            String format = "%-50s %-10s %-50s\n";
+            System.out.printf(format, "Name", "Size", "Attributes");
+            System.out.printf(format, "----", "----", "----------");
+            for (FileInfo fi: fileInfos) {
+                System.out.printf(format, fi.getFileName(), readableFileSize(fi.fileSize),
+                        EnumWithValue.EnumUtils.toEnumSet(fi.getFileAttributes(), FileAttributes.class));
+            }
+        }
+
+        public static String readableFileSize(long size) {
+            if(size <= 0) return "0";
+            final String[] units = new String[] { "B", "KB", "MB", "GB", "TB", "PB", "EB" };
+            int digitGroups = (int) (Math.log10(size)/Math.log10(1024));
+            String result = null;
+            result = new DecimalFormat("#,##0.#").format(size/Math.pow(1024, digitGroups)) + " " + units[digitGroups];
+            return result;
         }
     }
 }
