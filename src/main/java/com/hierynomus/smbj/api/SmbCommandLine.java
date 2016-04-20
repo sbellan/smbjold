@@ -33,6 +33,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.io.UnsupportedEncodingException;
+import java.net.MalformedURLException;
 import java.net.URL;
 import java.net.URLDecoder;
 import java.util.EnumSet;
@@ -42,46 +43,57 @@ import java.util.Map;
 
 public class SmbCommandLine {
 
-    String host = null;
-    String domain = null;
-    String user = null;
-    String password = null;
-    String sharePath = null;
-    boolean useOffsetForEmptyNames = false;
-
     public static void main(String[] args) throws IOException, SmbApiException {
         SmbCommandLine scl = new SmbCommandLine();
         scl.doMain(args);
     }
 
-    void doMain(String[] args) throws IOException, SmbApiException {
-        System.out.println("Usage: SmbCommandLine <url> <command>");
+    public static class ConnectInfo {
+        public String host = null;
+        public String domain = null;
+        public String user = null;
+        public String password = null;
+        public String sharePath = null;
+        public boolean useOffsetForEmptyNames = false;
+    }
 
-        URL smbUrl = new URL(null, args[0], new SmbHandler());
+    public static ConnectInfo getConnectInfo(String url) throws MalformedURLException, UnsupportedEncodingException {
+        URL smbUrl = new URL(null, url, new SmbHandler());
 
-        String host = smbUrl.getHost();
+        ConnectInfo ci = new ConnectInfo();
+        ci.host = smbUrl.getHost();
+        ci.sharePath = smbUrl.getPath();
+
         Map<String, String> queryParams = splitQuery(smbUrl.getQuery());
 
-        String domain = getArg("smbdomain", queryParams);
-        String user = getArg("smbuser", queryParams);
-        String password = getArg("smbpassword", queryParams);
-        String sharePath = smbUrl.getPath();
+        ci.domain = getArg("smbdomain", queryParams);
+        ci.user = getArg("smbuser", queryParams);
+        ci.password = getArg("smbpassword", queryParams);
 
         if (smbUrl.getUserInfo() != null) {
             String[] userInfoSplits = smbUrl.getUserInfo().split(":", 1);
             if (userInfoSplits.length >= 1) {
-                if (user == null) user = userInfoSplits[0];
+                if (ci.user == null) ci.user = userInfoSplits[0];
                 if (userInfoSplits.length >= 2) {
-                    if (password == null) password = userInfoSplits[1];
+                    if (ci.password == null) ci.password = userInfoSplits[1];
                 }
             }
         }
-        if (domain == null) domain = "?";
+        if (ci.domain == null) ci.domain = "?";
 
-        System.out.printf("%s-%s-%s-%s-%s\n", host, domain, user, password, sharePath);
-        ShareConnectionSync scs = SmbjApi.connect(getConfig(), host, user, password, domain, sharePath);
+        return ci;
+    }
 
+    void doMain(String[] args) throws IOException, SmbApiException {
+
+        ShareConnectionSync scs = null;
         try {
+            ConnectInfo ci = getConnectInfo(args[0]);
+
+            System.out.printf("%s-%s-%s-%s-%s\n", ci.host, ci.domain, ci.user, ci.password, ci.sharePath);
+            scs = SmbjApi.connect(
+                    getConfig(ci.useOffsetForEmptyNames), ci.host, ci.user, ci.password, ci.domain, ci.sharePath);
+
             String command = args[1].toLowerCase();
             String path = null;
             switch (command) {
@@ -127,12 +139,12 @@ public class SmbCommandLine {
             System.err.println("   write <localfile> <remotepath>");
             System.err.println("   write <remotepath> <localfile>");
         } finally {
-            SmbjApi.disconnect(scs);
+            if (scs != null) SmbjApi.disconnect(scs);
         }
 
     }
 
-    private String getArg(String name, Map<String, String> queryParams) {
+    private static String getArg(String name, Map<String, String> queryParams) {
         String val = queryParams.get(name.toUpperCase());
         if (val == null) {
             // Check in env
@@ -142,7 +154,8 @@ public class SmbCommandLine {
         return val;
     }
 
-    public Map<String, String> splitQuery(String query) throws UnsupportedEncodingException {
+    public static Map<String, String> splitQuery(String query) throws UnsupportedEncodingException {
+        if (query == null) return new HashMap<>();
         Map<String, String> query_pairs = new HashMap<String, String>();
         String[] pairs = query.split("&");
         for (String pair : pairs) {
@@ -163,8 +176,10 @@ public class SmbCommandLine {
 
         final SMB2FileId smb2FileId =
                 SmbjApi.openDirectory(scs, path,
-                        EnumSet.of(SMB2DirectoryAccessMask.FILE_LIST_DIRECTORY, SMB2DirectoryAccessMask.FILE_READ_ATTRIBUTES),
-                        EnumSet.of(SMB2ShareAccess.FILE_SHARE_DELETE, SMB2ShareAccess.FILE_SHARE_WRITE, SMB2ShareAccess.FILE_SHARE_READ),
+                        EnumSet.of(SMB2DirectoryAccessMask.FILE_LIST_DIRECTORY, SMB2DirectoryAccessMask
+                                .FILE_READ_ATTRIBUTES),
+                        EnumSet.of(SMB2ShareAccess.FILE_SHARE_DELETE, SMB2ShareAccess.FILE_SHARE_WRITE,
+                                SMB2ShareAccess.FILE_SHARE_READ),
                         SMB2CreateDisposition.FILE_OPEN,
                         EnumSet.of(SMB2CreateOptions.FILE_DIRECTORY_FILE));
 
@@ -174,8 +189,14 @@ public class SmbCommandLine {
             @Override
             public void run() {
                 currentThread.interrupt();
-                try { SmbjApi.close(scs, smb2FileId);} catch (Exception ignore) {}
-                try { SmbjApi.disconnect(scs);} catch (Exception ignore) {}
+                try {
+                    SmbjApi.close(scs, smb2FileId);
+                } catch (Exception ignore) {
+                }
+                try {
+                    SmbjApi.disconnect(scs);
+                } catch (Exception ignore) {
+                }
             }
         });
         while (true) {
@@ -188,7 +209,8 @@ public class SmbCommandLine {
         SmbjApi.rm(scs, path);
     }
 
-    private void doDeleteDir(ShareConnectionSync scs, String path, boolean recursive) throws SmbApiException, TransportException {
+    private void doDeleteDir(ShareConnectionSync scs, String path, boolean recursive) throws SmbApiException,
+            TransportException {
         SmbjApi.rmdir(scs, path, recursive);
     }
 
@@ -205,7 +227,7 @@ public class SmbCommandLine {
         }
     }
 
-    private Config getConfig() {
+    private Config getConfig(final boolean useOffsetForEmptyNames) {
         return new DefaultConfig() {
             @Override
             public boolean isUseOffsetForEmptyNames() {

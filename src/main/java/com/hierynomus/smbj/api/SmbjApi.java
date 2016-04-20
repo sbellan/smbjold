@@ -104,14 +104,18 @@ public class SmbjApi {
      * @throws IOException
      * @throws SmbApiException
      */
-    public static ShareConnectionSync connect(Config smbConfig, String host, String user, String password, String domain, String sharePath)
+    public static ShareConnectionSync connect(
+            Config smbConfig, String host, String user, String password, String domain, String sharePath)
             throws IOException, SmbApiException {
         logger.info("Connect {},{},{},{}", host, user, domain, sharePath);
         SMB2Dialect dialect = SMB2Dialect.SMB_2_1;
         SMBClient client = new SMBClient(smbConfig);
         //String workstation = "SMBJ-" + UUID.randomUUID().toString();
         Connection connection = client.connect(host);
-        AuthenticationContext ac = new AuthenticationContext(user, password.toCharArray(), domain);
+        AuthenticationContext ac = new AuthenticationContext(
+                user,
+                password == null ? new char[0] : password.toCharArray(),
+                domain);
         Session session = connection.authenticate(ac);
 
         sharePath = sharePath.replace("/", "\\");

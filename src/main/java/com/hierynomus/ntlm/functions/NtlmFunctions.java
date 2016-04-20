@@ -55,8 +55,8 @@ public class NtlmFunctions {
      */
     public static byte[] NTOWFv2(String password, String username, String userDomain) {
         byte[] keyBytes = NTOWFv1(password, username, userDomain);
-        byte[] usernameBytes = unicode(username.toUpperCase());
-        byte[] userDomainBytes = unicode(userDomain);
+        byte[] usernameBytes = username == null ? new byte[0] : unicode(username.toUpperCase());
+        byte[] userDomainBytes = userDomain == null ? new byte[0] : unicode(userDomain);
         return hmac_md5(keyBytes, usernameBytes, userDomainBytes);
     }
 

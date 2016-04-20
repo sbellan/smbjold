@@ -2,6 +2,7 @@ import com.hierynomus.smbj.Config;
 import com.hierynomus.smbj.DefaultConfig;
 import com.hierynomus.smbj.api.ShareConnectionSync;
 import com.hierynomus.smbj.api.SmbApiException;
+import com.hierynomus.smbj.api.SmbCommandLine;
 import com.hierynomus.smbj.api.SmbjApi;
 import com.hierynomus.smbj.smb2.SMB2StatusCode;
 import com.hierynomus.smbj.smb2.messages.SMB2QueryDirectoryResponse;
@@ -21,7 +22,6 @@ import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.util.Arrays;
 import java.util.List;
-import java.util.Properties;
 import java.util.UUID;
 
 import static org.junit.Assert.assertArrayEquals;
@@ -30,44 +30,36 @@ import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
 /**
- * Created by temp on 4/7/16.
+ * Integration test Pre-Req
+ *
+ * Set the environment variable TEST_SMBJ_API_URL to an SMB URL,
+ * smb://<host>/<sharepath>?[smbuser=user]&[smbpassword=pass]&[smbdomain=domain]
+ *
+ * For eg.) smb://192.168.99.100/public?smbuser=u1&smbpassword=pass1&smbdomain=CORP
+ *
  */
 public class TestSmbjApi {
 
     private static final Logger logger = LoggerFactory.getLogger(TestSmbjApi.class);
 
-    static String host = null;
-    static String domain = null;
-    static String user = null;
-    static String password = null;
-    static String sharePath = null;
-    static boolean useOffsetForEmptyNames = false;
+    static SmbCommandLine.ConnectInfo ci;
 
     String TEST_PATH = "junit_testsmbjapi";
 
     @BeforeClass
     public static void setup() throws IOException {
-        String env = System.getenv("TEST_SMBJ_API_ENV");
-        if (env == null) {
-            env = "default";
+        String url = System.getenv("TEST_SMBJ_API_URL");
+        if (url == null) {
+            url = "smb://localhost/share";
         }
-        Properties p = new Properties();
-        String loadFileName = "/testfiles/connection_" + env + ".properties";
-
-        logger.info("Trying to load {}", loadFileName);
-
-        p.load(TestSmbjApi.class.getResourceAsStream(loadFileName));
-        host = p.getProperty("host");
-        domain = p.getProperty("domain");
-        user = p.getProperty("user");
-        password = p.getProperty("password");
-        sharePath = p.getProperty("share_path");
-        useOffsetForEmptyNames = Boolean.parseBoolean(p.getProperty("use_offset_for_empty_names", "false"));
+        ci = SmbCommandLine.getConnectInfo(url);
+        System.out.printf("%s-%s-%s-%s-%s\n", ci.host, ci.domain, ci.user, ci.password, ci.sharePath);
     }
 
     @Test
     public void testFull() throws IOException, SmbApiException, URISyntaxException {
-        ShareConnectionSync scs = SmbjApi.connect(getConfig(), host, user, password, domain, sharePath);
+        ShareConnectionSync scs = SmbjApi.connect(
+                getConfig(ci.useOffsetForEmptyNames), ci.host, ci.user, ci.password, ci.domain, ci.sharePath);
 
         try {
             // Remove the test directory and ignore not found
@@ -185,7 +177,7 @@ public class TestSmbjApi {
         }
     }
 
-    private Config getConfig() {
+    private Config getConfig(final boolean useOffsetForEmptyNames) {
         return new DefaultConfig() {
             @Override
             public boolean isUseOffsetForEmptyNames() {
