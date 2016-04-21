@@ -62,6 +62,7 @@ import com.hierynomus.smbj.smb2.messages.SMB2TreeDisconnectResponse;
 import com.hierynomus.smbj.smb2.messages.SMB2WriteRequest;
 import com.hierynomus.smbj.smb2.messages.SMB2WriteResponse;
 import com.hierynomus.smbj.transport.TransportException;
+import com.hierynomus.utils.PathUtils;
 import org.bouncycastle.jce.provider.BouncyCastleProvider;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -505,7 +506,7 @@ public class SmbjApi {
         try {
             fileId = open(
                     scs, path,
-                    EnumWithValue.EnumUtils.toLong(EnumSet.of(SMB2DirectoryAccessMask.READ_CONTROL)),
+                    EnumWithValue.EnumUtils.toLong(EnumSet.of(SMB2DirectoryAccessMask.GENERIC_READ)),
                     EnumSet.of(FileAttributes.FILE_ATTRIBUTE_NORMAL),
                     EnumSet.of(SMB2ShareAccess.FILE_SHARE_DELETE, SMB2ShareAccess.FILE_SHARE_WRITE,
                             SMB2ShareAccess.FILE_SHARE_READ),
@@ -517,6 +518,10 @@ public class SmbjApi {
                     fileInformationClass, null, null, securityInfo);
             scs.getConnection().send(qreq);
             SMB2QueryInfoResponse qresp = (SMB2QueryInfoResponse) scs.getConnection().receive().get(0);
+            if (qresp.getHeader().getStatus() != SMB2StatusCode.STATUS_SUCCESS) {
+                throw new SmbApiException(qresp.getHeader().getStatus(), qresp.getHeader().getStatusCode(),
+                        "QUERY_INFO failed for " + path, null);
+            }
             return qresp.getOutputBuffer();
         } finally {
             if (fileId != null) close(scs, fileId);
@@ -530,7 +535,7 @@ public class SmbjApi {
         SMB2FileId fileId = null;
         try {
             fileId = openDirectory(scs, path,
-                    EnumSet.noneOf(SMB2DirectoryAccessMask.class),
+                    EnumSet.of(SMB2DirectoryAccessMask.FILE_READ_ATTRIBUTES),
                     EnumSet.of(SMB2ShareAccess.FILE_SHARE_DELETE, SMB2ShareAccess.FILE_SHARE_WRITE,
                             SMB2ShareAccess.FILE_SHARE_READ),
                     SMB2CreateDisposition.FILE_OPEN,
@@ -557,9 +562,9 @@ public class SmbjApi {
             List<FileInfo> list = list(scs, path);
             for (FileInfo fi : list) {
                 if (!EnumWithValue.EnumUtils.isSet(fi.getFileAttributes(), FileAttributes.FILE_ATTRIBUTE_DIRECTORY)) {
-                    rm(scs, path + "/" + fi.getFileName());
+                    rm(scs, PathUtils.get(path, fi.getFileName()));
                 } else {
-                    rmdir(scs, path + "/" + fi.getFileName(), recursive);
+                    rmdir(scs, PathUtils.get(path, fi.getFileName()), recursive);
                 }
             }
             rmdir(scs, path, false);

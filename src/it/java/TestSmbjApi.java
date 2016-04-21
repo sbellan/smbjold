@@ -26,8 +26,8 @@ import com.hierynomus.smbj.api.SmbApiException;
 import com.hierynomus.smbj.api.SmbCommandLine;
 import com.hierynomus.smbj.api.SmbjApi;
 import com.hierynomus.smbj.smb2.SMB2StatusCode;
-import com.hierynomus.smbj.smb2.messages.SMB2QueryDirectoryResponse;
 import com.hierynomus.smbj.transport.TransportException;
+import com.hierynomus.utils.PathUtils;
 import org.junit.BeforeClass;
 import org.junit.Test;
 import org.slf4j.Logger;
@@ -68,7 +68,7 @@ public class TestSmbjApi {
 
     static SmbCommandLine.ConnectInfo ci;
 
-    String TEST_PATH = "junit_testsmbjapi";
+    String TEST_PATH = PathUtils.fix("junit_testsmbjapi");
 
     @BeforeClass
     public static void setup() throws IOException {
@@ -115,22 +115,22 @@ public class TestSmbjApi {
                 }
             }
             // Create it again
-            SmbjApi.mkdir(scs, TEST_PATH);
-            SmbjApi.mkdir(scs, TEST_PATH + "/1");
-            SmbjApi.mkdir(scs, TEST_PATH + "/1/2");
-            SmbjApi.mkdir(scs, TEST_PATH + "/1/2/3");
-            SmbjApi.mkdir(scs, TEST_PATH + "/1/2/3/4");
-            SmbjApi.mkdir(scs, TEST_PATH + "/2");
-            SmbjApi.mkdir(scs, TEST_PATH + "/3");
-            SmbjApi.mkdir(scs, TEST_PATH + "/4");
-            SmbjApi.mkdir(scs, TEST_PATH + "/4/2");
-            SmbjApi.mkdir(scs, TEST_PATH + "/4/2/3");
-            SmbjApi.mkdir(scs, TEST_PATH + "/4/2/3/4");
+            SmbjApi.mkdir(scs, PathUtils.fix(TEST_PATH));
+            SmbjApi.mkdir(scs, PathUtils.fix(TEST_PATH + "/1"));
+            SmbjApi.mkdir(scs, PathUtils.fix(TEST_PATH + "/1/2"));
+            SmbjApi.mkdir(scs, PathUtils.fix(TEST_PATH + "/1/2/3"));
+            SmbjApi.mkdir(scs, PathUtils.fix(TEST_PATH + "/1/2/3/4"));
+            SmbjApi.mkdir(scs, PathUtils.fix(TEST_PATH + "/2"));
+            SmbjApi.mkdir(scs, PathUtils.fix(TEST_PATH + "/3"));
+            SmbjApi.mkdir(scs, PathUtils.fix(TEST_PATH + "/4"));
+            SmbjApi.mkdir(scs, PathUtils.fix(TEST_PATH + "/4/2"));
+            SmbjApi.mkdir(scs, PathUtils.fix(TEST_PATH + "/4/2/3"));
+            SmbjApi.mkdir(scs, PathUtils.fix(TEST_PATH + "/4/2/3/4"));
 
-            assertTrue(SmbjApi.folderExists(scs, TEST_PATH));
-            assertTrue(SmbjApi.folderExists(scs, TEST_PATH + "/4/2/3/4"));
+            assertTrue(SmbjApi.folderExists(scs, PathUtils.fix(TEST_PATH)));
+            assertTrue(SmbjApi.folderExists(scs, PathUtils.fix(TEST_PATH + "/4/2/3/4")));
             try {
-                SmbjApi.fileExists(scs, TEST_PATH);
+                SmbjApi.fileExists(scs, PathUtils.fix(TEST_PATH));
                 fail(TEST_PATH + " is not a file");
             } catch (SmbApiException sae) {
                 if (sae.getStatusCode() != SMB2StatusCode.STATUS_FILE_IS_A_DIRECTORY) {
@@ -138,36 +138,36 @@ public class TestSmbjApi {
                 }
             }
 
-            FileInfo fileInformation = SmbjApi.getFileInformation(scs, TEST_PATH + "/4/2");
+            FileInfo fileInformation = SmbjApi.getFileInformation(scs, PathUtils.fix(TEST_PATH + "/4/2"));
             assertTrue(EnumWithValue.EnumUtils.isSet(
                     fileInformation.getFileAttributes(), FileAttributes.FILE_ATTRIBUTE_DIRECTORY));
 
-            assertFilesInPathEquals(scs, new String[]{"1", "2", "3", "4"}, TEST_PATH);
+            assertFilesInPathEquals(scs, new String[]{"1", "2", "3", "4"}, PathUtils.fix(TEST_PATH));
 
             // Delete folder (Non recursive)
-            SmbjApi.rmdir(scs, TEST_PATH + "/2", false);
-            assertFilesInPathEquals(scs, new String[]{"1", "3", "4"}, TEST_PATH);
+            SmbjApi.rmdir(scs, PathUtils.fix(TEST_PATH + "/2"), false);
+            assertFilesInPathEquals(scs, new String[]{"1", "3", "4"}, PathUtils.fix(TEST_PATH));
 
             // Delete folder (recursive)
-            SmbjApi.rmdir(scs, TEST_PATH + "/4", true);
-            assertFilesInPathEquals(scs, new String[]{"1", "3"}, TEST_PATH);
+            SmbjApi.rmdir(scs, PathUtils.fix(TEST_PATH + "/4"), true);
+            assertFilesInPathEquals(scs, new String[]{"1", "3"}, PathUtils.fix(TEST_PATH));
 
             // Upload 2 files
             String file1 = UUID.randomUUID().toString() + ".txt";
             String file2 = UUID.randomUUID().toString() + ".txt";
             String file3 = UUID.randomUUID().toString() + ".pdf";
-            write(scs, TEST_PATH + "/1/" + file1, "testfiles/medium.txt");
-            write(scs, TEST_PATH + "/1/2/3/" + file2, "testfiles/small.txt");
-            write(scs, TEST_PATH + "/1/2/3/" + file3, "testfiles/large.pdf");
+            write(scs, PathUtils.fix(TEST_PATH + "/1/" + file1), "testfiles/medium.txt");
+            write(scs, PathUtils.fix(TEST_PATH + "/1/2/3/" + file2), "testfiles/small.txt");
+            write(scs, PathUtils.fix(TEST_PATH + "/1/2/3/" + file3), "testfiles/large.pdf");
 
-            assertFilesInPathEquals(scs, new String[]{file2, file3, "4"}, TEST_PATH + "/1/2/3");
+            assertFilesInPathEquals(scs, new String[]{file2, file3, "4"}, PathUtils.fix(TEST_PATH + "/1/2/3"));
 
-            fileInformation = SmbjApi.getFileInformation(scs, TEST_PATH + "/1/2/3/" + file3);
+            fileInformation = SmbjApi.getFileInformation(scs, PathUtils.fix(TEST_PATH + "/1/2/3/" + file3));
             assertTrue(!EnumWithValue.EnumUtils.isSet(
                     fileInformation.getFileAttributes(), FileAttributes.FILE_ATTRIBUTE_DIRECTORY));
 
             try {
-                SmbjApi.folderExists(scs, TEST_PATH + "/1/2/3/" + file2);
+                SmbjApi.folderExists(scs, PathUtils.fix(TEST_PATH + "/1/2/3/" + file2));
                 fail(TEST_PATH + " is not a folder");
             } catch (SmbApiException sae) {
                 if (sae.getStatusCode() != SMB2StatusCode.STATUS_NOT_A_DIRECTORY) {
@@ -177,22 +177,22 @@ public class TestSmbjApi {
 
 
             //Delete
-            SmbjApi.rm(scs, TEST_PATH + "/1/2/3/" + file2);
-            assertFilesInPathEquals(scs, new String[]{"4", file3}, TEST_PATH + "/1/2/3");
+            SmbjApi.rm(scs, PathUtils.fix(TEST_PATH + "/1/2/3/" + file2));
+            assertFilesInPathEquals(scs, new String[]{"4", file3}, PathUtils.fix(TEST_PATH + "/1/2/3"));
 
             // Download and compare with originals
             File tmpFile1 = File.createTempFile("smbj", "junit");
             try (OutputStream os = new FileOutputStream(tmpFile1)) {
-                SmbjApi.read(scs, TEST_PATH + "/1/" + file1, os);
+                SmbjApi.read(scs, PathUtils.fix(TEST_PATH + "/1/" + file1), os);
             }
             assertFileContent("testfiles/medium.txt", tmpFile1.getAbsolutePath());
 
-            SecurityDescriptor sd = SmbjApi.getSecurityInfo(scs, TEST_PATH + "/1/" + file1, EnumSet.of(SecurityInformation
+            SecurityDescriptor sd = SmbjApi.getSecurityInfo(scs, PathUtils.fix(TEST_PATH + "/1/" + file1), EnumSet.of(SecurityInformation
                             .OWNER_SECURITY_INFORMATION,
                     SecurityInformation.GROUP_SECURITY_INFORMATION,
                     SecurityInformation.DACL_SECURITY_INFORMATION));
-            assertEquals(sd.getControl(), EnumSet.of(SecurityDescriptor.Control.PS, SecurityDescriptor.Control.DD,
-                    SecurityDescriptor.Control.OD));
+            assertTrue(sd.getControl().contains(SecurityDescriptor.Control.PS));
+            assertTrue(sd.getControl().contains(SecurityDescriptor.Control.OD));
             assertNotNull(sd.getOwnerSid());
             assertNotNull(sd.getGroupSid());
             assertNotNull(sd.getDacl());
@@ -201,8 +201,8 @@ public class TestSmbjApi {
             System.out.println(sd);
 
             // Clean up
-            SmbjApi.rmdir(scs, TEST_PATH, true);
-            assertFalse(SmbjApi.folderExists(scs, TEST_PATH));
+            SmbjApi.rmdir(scs, PathUtils.fix(TEST_PATH), true);
+            assertFalse(SmbjApi.folderExists(scs, PathUtils.fix(TEST_PATH)));
 
         } finally {
             SmbjApi.disconnect(scs);
