@@ -17,8 +17,6 @@ package com.hierynomus.smbj.smb2.messages;
 
 import com.hierynomus.msdtyp.MsDataTypes;
 import com.hierynomus.msfscc.FileAttributes;
-import com.hierynomus.msfscc.fileinformation.FileInfo;
-import com.hierynomus.msfscc.fileinformation.FileInformationFactory;
 import com.hierynomus.ntlm.functions.NtlmFunctions;
 import com.hierynomus.protocol.commons.EnumWithValue;
 import com.hierynomus.protocol.commons.buffer.Buffer;
@@ -32,16 +30,14 @@ import java.util.Date;
 import java.util.List;
 
 /**
- * [MS-SMB2].pdf 2.2.34 SMB2 QUERY_DIRECTORY Response
+ * [MS-SMB2].pdf 2.2.38 SMB2 QUERY_INFO Response
  * <p>
 \ */
-public class SMB2QueryDirectoryResponse extends SMB2Packet {
+public class SMB2QueryInfoResponse extends SMB2Packet {
 
-    int outputBufferOffset;
-    int outBufferLength;
     byte[] outputBuffer;
 
-    public SMB2QueryDirectoryResponse() {
+    public SMB2QueryInfoResponse() {
         super();
     }
 
@@ -51,18 +47,9 @@ public class SMB2QueryDirectoryResponse extends SMB2Packet {
         if (header.getStatus() != SMB2StatusCode.STATUS_SUCCESS) return;
 
         buffer.skip(2); // StructureSize (2 bytes)
-        outputBufferOffset = buffer.readUInt16(); // Buffer Offset
-        outBufferLength = buffer.readUInt16(); // Buffer length
-        buffer.rpos(outputBufferOffset);
-        outputBuffer = buffer.readRawBytes(outBufferLength);
-    }
-
-    public int getOutputBufferOffset() {
-        return outputBufferOffset;
-    }
-
-    public int getOutBufferLength() {
-        return outBufferLength;
+        int outputBufferOffset = buffer.readUInt16(); // Buffer Offset
+        long outBufferLength = buffer.readUInt32(); // Buffer length
+        outputBuffer = buffer.readRawBytes((int)outBufferLength);
     }
 
     public byte[] getOutputBuffer() {

@@ -34,6 +34,9 @@ public class SecurityDescriptor {
     private ACL sacl;
     private ACL dacl;
 
+    public SecurityDescriptor() {
+    }
+
     public SecurityDescriptor(EnumSet<Control> control, SID ownerSid, SID groupSid, ACL sacl, ACL dacl) {
         this.control = control;
         this.ownerSid = ownerSid;
@@ -94,6 +97,37 @@ public class SecurityDescriptor {
             dacl = new ACL();
             dacl.read(buffer);
         }
+    }
+
+    public EnumSet<Control> getControl() {
+        return control;
+    }
+
+    public SID getOwnerSid() {
+        return ownerSid;
+    }
+
+    public SID getGroupSid() {
+        return groupSid;
+    }
+
+    public ACL getSacl() {
+        return sacl;
+    }
+
+    public ACL getDacl() {
+        return dacl;
+    }
+
+    @Override
+    public String toString() {
+        return "SecurityDescriptor{" +
+                "control=" + control +
+                ", ownerSid=" + ownerSid +
+                ", groupSid=" + groupSid +
+                ", sacl=" + sacl +
+                ", dacl=" + dacl +
+                '}';
     }
 
     // SecurityDescriptor Control bits

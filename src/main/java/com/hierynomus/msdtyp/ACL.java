@@ -60,6 +60,26 @@ public class ACL {
         }
     }
 
+    public int getAceCount() {
+        return aceCount;
+    }
+
+    public byte[] getSidIdentifierAuthority() {
+        return sidIdentifierAuthority;
+    }
+
+    public long[] getSubAuthorities() {
+        return subAuthorities;
+    }
+
+    public ACE[] getAces() {
+        return aces;
+    }
+
+    public int getAclSize() {
+        return aclSize;
+    }
+
     @Override
     public String toString() {
         return "ACL{" +

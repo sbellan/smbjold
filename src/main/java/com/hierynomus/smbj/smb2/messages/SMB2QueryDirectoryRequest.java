@@ -50,11 +50,7 @@ public class SMB2QueryDirectoryRequest extends SMB2Packet {
                                      String searchPattern) {
 
         super(smbDialect, SMB2MessageCommandCode.SMB2_QUERY_DIRECTORY);
-        // Currently only MS-FSCC 2.4.17 FileIdBothDirectoryInformation is supported
 
-        if (fileInformationClass != FileInformationClass.FileIdBothDirectoryInformation) {
-            throw new RuntimeException("Not Implemented");
-        }
         getHeader().setSessionId(sessionId);
         getHeader().setTreeId(treeId);
         this.fileInformationClass = fileInformationClass;

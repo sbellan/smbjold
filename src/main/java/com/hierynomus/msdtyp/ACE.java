@@ -18,7 +18,9 @@ package com.hierynomus.msdtyp;
 import com.hierynomus.protocol.commons.EnumWithValue;
 import com.hierynomus.protocol.commons.buffer.Buffer;
 import com.hierynomus.smbj.common.SMBBuffer;
+import com.hierynomus.smbj.smb2.SMB2DirectoryAccessMask;
 
+import java.util.Arrays;
 import java.util.EnumSet;
 import java.util.UUID;
 
@@ -117,6 +119,15 @@ public abstract class ACE {
         return ace;
     }
 
+    @Override
+    public String toString() {
+        return "ACE{" +
+                "aceHeader=" + aceHeader +
+                ", accessMask=" + EnumWithValue.EnumUtils.toEnumSet(accessMask, SMB2DirectoryAccessMask.class) +
+                ", sid=" + sid +
+                '}';
+    }
+
     protected abstract void readMessage(SMBBuffer buffer) throws Buffer.BufferException;
 
     public AceHeader getAceHeader() {
@@ -161,6 +172,15 @@ public abstract class ACE {
 
         public void setAceSize(int aceSize) {
             this.aceSize = aceSize;
+        }
+
+        @Override
+        public String toString() {
+            return "AceHeader{" +
+                    "aceType=" + aceType +
+                    ", aceFlags=" + aceFlags +
+                    ", aceSize=" + aceSize +
+                    '}';
         }
     }
 
@@ -284,6 +304,7 @@ class AceType1 extends ACE {
         getSid().read(buffer);
     }
 
+
 }
 
 // Type 2 - Header/Mask/Flags/ObjectType/InheritedObjectType/SID
@@ -331,7 +352,14 @@ class AceType2Object extends ACE {
         getSid().read(buffer);
     }
 
-
+    @Override
+    public String toString() {
+        return "AceType2Object{" +
+                "flags=" + flags +
+                ", objectType=" + objectType +
+                ", inheritedObjectType=" + inheritedObjectType +
+                "} " + super.toString();
+    }
 }
 
 // Type 3 - Header/Mask/SID/ApplicationData
@@ -365,6 +393,12 @@ class AceType3 extends ACE {
         applicationData = buffer.readRawBytes(aceHeader.getAceSize() - 4 + 4 + getSid().byteCount());
     }
 
+    @Override
+    public String toString() {
+        return "AceType3{" +
+                "applicationData=" + Arrays.toString(applicationData) +
+                "} " + super.toString();
+    }
 }
 
 // Type 4 - Header/Mask/Flags/ObjectType/InheritedObjectType/Sid/ApplicationData
@@ -396,6 +430,13 @@ class AceType4 extends AceType2Object {
         super.readMessage(buffer);
         // application data length is derived from aceHeader.size
         applicationData = buffer.readRawBytes(aceHeader.getAceSize() - 4 + 4 + 4 + 16 + 16 + getSid().byteCount());
+    }
+
+    @Override
+    public String toString() {
+        return "AceType4{" +
+                "applicationData=" + Arrays.toString(applicationData) +
+                "} " + super.toString();
     }
 }
 

@@ -15,6 +15,7 @@
  */
 package com.hierynomus.smbj.api;
 
+import com.hierynomus.msfscc.fileinformation.FileInfo;
 import com.hierynomus.smbj.Config;
 import com.hierynomus.smbj.DefaultConfig;
 import com.hierynomus.smbj.common.SmbHandler;
@@ -97,6 +98,7 @@ public class SmbCommandLine {
             String command = args[1].toLowerCase();
             String path = null;
             switch (command) {
+                case "ls":
                 case "list":
                     path = args.length > 2 ? args[2] : null;
                     doList(scs, path);
@@ -125,7 +127,7 @@ public class SmbCommandLine {
                     read(scs, remotePath, localfile);
                     break;
                 default:
-                    System.out.println("Dont know");
+                    throw new IllegalArgumentException("Unknown command " + command);
             }
         } catch (Exception e) {
             System.err.println(e);
@@ -168,8 +170,8 @@ public class SmbCommandLine {
 
     public void doList(ShareConnectionSync scs, String path) throws SmbApiException, TransportException {
 
-        List<SMB2QueryDirectoryResponse.FileInfo> list = SmbjApi.list(scs, path);
-        SMB2QueryDirectoryResponse.FileInfoFormatter.print(list);
+        List<FileInfo> list = SmbjApi.list(scs, path);
+        FileInfo.printList(list);
     }
 
     public void doNotify(final ShareConnectionSync scs, String path) throws SmbApiException, TransportException {

@@ -15,14 +15,20 @@
  */
 package com.hierynomus.smbj.api;
 
+import com.hierynomus.msdtyp.SecurityDescriptor;
+import com.hierynomus.msdtyp.SecurityInformation;
 import com.hierynomus.msfscc.FileAttributes;
 import com.hierynomus.msfscc.FileInformationClass;
+import com.hierynomus.msfscc.fileinformation.FileInfo;
 import com.hierynomus.msfscc.fileinformation.FileInformationFactory;
 import com.hierynomus.protocol.commons.ByteArrayUtils;
 import com.hierynomus.protocol.commons.EnumWithValue;
+import com.hierynomus.protocol.commons.buffer.Buffer;
+import com.hierynomus.protocol.commons.buffer.Endian;
 import com.hierynomus.smbj.Config;
 import com.hierynomus.smbj.SMBClient;
 import com.hierynomus.smbj.auth.AuthenticationContext;
+import com.hierynomus.smbj.common.SMBBuffer;
 import com.hierynomus.smbj.connection.Connection;
 import com.hierynomus.smbj.session.Session;
 import com.hierynomus.smbj.smb2.SMB2CompletionFilter;
@@ -43,6 +49,8 @@ import com.hierynomus.smbj.smb2.messages.SMB2Logoff;
 import com.hierynomus.smbj.smb2.messages.SMB2LogoffResponse;
 import com.hierynomus.smbj.smb2.messages.SMB2QueryDirectoryRequest;
 import com.hierynomus.smbj.smb2.messages.SMB2QueryDirectoryResponse;
+import com.hierynomus.smbj.smb2.messages.SMB2QueryInfoRequest;
+import com.hierynomus.smbj.smb2.messages.SMB2QueryInfoResponse;
 import com.hierynomus.smbj.smb2.messages.SMB2ReadRequest;
 import com.hierynomus.smbj.smb2.messages.SMB2ReadResponse;
 import com.hierynomus.smbj.smb2.messages.SMB2SetInfoRequest;
@@ -58,7 +66,6 @@ import org.bouncycastle.jce.provider.BouncyCastleProvider;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -68,7 +75,7 @@ import java.util.List;
 
 /**
  * High-level API for basic use cases
- *
+ * <p>
  * All of the API's assume that the connection, session id and tree is managed by caller.
  * <p>
  * Each API is provided in 2 modes, one where the client manages the SMBFileId and the other
@@ -149,21 +156,21 @@ public class SmbjApi {
     }
 
     /**
-     *
-     * @param scs Connection Info
+     * @param scs  Connection Info
      * @param path Path relative to the connect root.
      *             Leave null or empty to list the root directory
      * @return List of FileInfo
      * @throws SmbApiException
      * @throws TransportException
      */
-    public static List<SMB2QueryDirectoryResponse.FileInfo> list(ShareConnectionSync scs, String path)
+    public static List<FileInfo> list(ShareConnectionSync scs, String path)
             throws SmbApiException, TransportException {
         logger.info("List {}", path);
 
         SMB2FileId fileId = openDirectory(scs, path,
                 EnumSet.of(SMB2DirectoryAccessMask.FILE_LIST_DIRECTORY, SMB2DirectoryAccessMask.FILE_READ_ATTRIBUTES),
-                EnumSet.of(SMB2ShareAccess.FILE_SHARE_DELETE, SMB2ShareAccess.FILE_SHARE_WRITE, SMB2ShareAccess.FILE_SHARE_READ),
+                EnumSet.of(SMB2ShareAccess.FILE_SHARE_DELETE, SMB2ShareAccess.FILE_SHARE_WRITE, SMB2ShareAccess
+                        .FILE_SHARE_READ),
                 SMB2CreateDisposition.FILE_OPEN,
                 EnumSet.of(SMB2CreateOptions.FILE_DIRECTORY_FILE));
 
@@ -181,7 +188,7 @@ public class SmbjApi {
     /**
      * List on a already open FileId
      */
-    public static List<SMB2QueryDirectoryResponse.FileInfo> list(ShareConnectionSync scs, SMB2FileId fileId)
+    public static List<FileInfo> list(ShareConnectionSync scs, SMB2FileId fileId)
             throws TransportException, SmbApiException {
         logger.info("List {}", ByteArrayUtils.printHex(fileId.getPersistentHandle()));
         // Query Directory Request
@@ -197,14 +204,20 @@ public class SmbjApi {
             throw new SmbApiException(qdresp.getHeader().getStatus(), qdresp.getHeader().getStatusCode(),
                     "Query directory failed for " + fileId, null);
         }
+        byte[] outputBuffer = qdresp.getOutputBuffer();
 
-        return qdresp.getFileInfoList();
+        try {
+            return FileInformationFactory.parseFileInformationList(
+                    outputBuffer, qdresp.getOutputBufferOffset(), qdresp.getOutBufferLength(), FileInformationClass.FileAllInformation);
+        } catch (Buffer.BufferException e) {
+            throw new TransportException(e);
+        }
     }
 
 
     /**
      * SMB2 CHANGE NOTIFY
-     *
+     * <p>
      * This is implemented as blocking call which will wait until any changes have been observed.
      * Clients who expect to be continuously notified should invoke this function again to listen
      * for more changes.
@@ -321,8 +334,8 @@ public class SmbjApi {
             }
 
             if (rresp.getHeader().getStatus() != SMB2StatusCode.STATUS_END_OF_FILE) {
-               throw new SmbApiException(rresp.getHeader().getStatus(), rresp.getHeader().getStatusCode(),
-                       "Read failed for " + path, null);
+                throw new SmbApiException(rresp.getHeader().getStatus(), rresp.getHeader().getStatusCode(),
+                        "Read failed for " + path, null);
             }
 
         } finally {
@@ -332,7 +345,8 @@ public class SmbjApi {
         }
     }
 
-    public static SMB2FileId openFile(ShareConnectionSync scs, String path, FileOpenMode mode, SMB2CreateDisposition createDisposition)
+    public static SMB2FileId openFile(ShareConnectionSync scs, String path, FileOpenMode mode, SMB2CreateDisposition
+            createDisposition)
             throws TransportException, SmbApiException {
         logger.info("OpenFile {},{},{}", path, mode, createDisposition);
         EnumSet<SMB2DirectoryAccessMask> accessMask =
@@ -420,7 +434,8 @@ public class SmbjApi {
 
         SMB2FileId fileId = openDirectory(scs, path,
                 EnumSet.of(SMB2DirectoryAccessMask.FILE_LIST_DIRECTORY, SMB2DirectoryAccessMask.FILE_ADD_SUBDIRECTORY),
-                EnumSet.of(SMB2ShareAccess.FILE_SHARE_DELETE, SMB2ShareAccess.FILE_SHARE_WRITE, SMB2ShareAccess.FILE_SHARE_READ),
+                EnumSet.of(SMB2ShareAccess.FILE_SHARE_DELETE, SMB2ShareAccess.FILE_SHARE_WRITE, SMB2ShareAccess
+                        .FILE_SHARE_READ),
                 SMB2CreateDisposition.FILE_CREATE,
                 EnumSet.of(SMB2CreateOptions.FILE_DIRECTORY_FILE));
 
@@ -436,6 +451,76 @@ public class SmbjApi {
     public static boolean folderExists(ShareConnectionSync scs, String path)
             throws SmbApiException, TransportException {
         return exists(scs, path, EnumSet.of(SMB2CreateOptions.FILE_DIRECTORY_FILE));
+    }
+
+    /**
+     * @return The SecurityDescriptor(MS-DTYP 2.4.6 SECURITY_DESCRIPTOR) for the Given Path
+     * @throws SmbApiException
+     * @throws TransportException
+     */
+    public static SecurityDescriptor getSecurityInfo(
+            ShareConnectionSync scs, String path, EnumSet<SecurityInformation> securityInfo)
+            throws SmbApiException, TransportException {
+
+        byte[] outputBuffer = queryInfoCommon(scs, path,
+                SMB2QueryInfoRequest.SMB2QueryInfoType.SMB2_0_INFO_SECURITY, securityInfo, null);
+        SecurityDescriptor sd = new SecurityDescriptor();
+        try {
+            sd.read(new SMBBuffer(outputBuffer));
+        } catch (Buffer.BufferException e) {
+            throw new TransportException(e);
+        }
+        return sd;
+    }
+
+    /**
+     * @return The FileInformation for the Given Path
+     * @throws SmbApiException
+     * @throws TransportException
+     */
+    public static FileInfo getFileInformation(
+            ShareConnectionSync scs, String path)
+            throws SmbApiException, TransportException {
+
+        byte[] outputBuffer = queryInfoCommon(scs, path,
+                SMB2QueryInfoRequest.SMB2QueryInfoType.SMB2_0_INFO_FILE, null,
+                FileInformationClass.FileAllInformation);
+
+        try {
+            return FileInformationFactory.parseFileAllInformation(
+                    new Buffer.PlainBuffer(outputBuffer, Endian.LE));
+        } catch (Buffer.BufferException e) {
+            throw new TransportException(e);
+        }
+    }
+
+    private static byte[] queryInfoCommon(ShareConnectionSync scs, String path,
+                                          SMB2QueryInfoRequest.SMB2QueryInfoType infoType,
+                                          EnumSet<SecurityInformation> securityInfo,
+                                          FileInformationClass fileInformationClass
+    )
+            throws SmbApiException, TransportException {
+
+        SMB2FileId fileId = null;
+        try {
+            fileId = open(
+                    scs, path,
+                    EnumWithValue.EnumUtils.toLong(EnumSet.of(SMB2DirectoryAccessMask.READ_CONTROL)),
+                    EnumSet.of(FileAttributes.FILE_ATTRIBUTE_NORMAL),
+                    EnumSet.of(SMB2ShareAccess.FILE_SHARE_DELETE, SMB2ShareAccess.FILE_SHARE_WRITE,
+                            SMB2ShareAccess.FILE_SHARE_READ),
+                    SMB2CreateDisposition.FILE_OPEN,
+                    null);
+            SMB2QueryInfoRequest qreq = new SMB2QueryInfoRequest(
+                    DIALECT, scs.getSession().getSessionId(), scs.getTreeId(),
+                    fileId, infoType,
+                    fileInformationClass, null, null, securityInfo);
+            scs.getConnection().send(qreq);
+            SMB2QueryInfoResponse qresp = (SMB2QueryInfoResponse) scs.getConnection().receive().get(0);
+            return qresp.getOutputBuffer();
+        } finally {
+            if (fileId != null) close(scs, fileId);
+        }
     }
 
     private static boolean exists(ShareConnectionSync scs, String path, EnumSet<SMB2CreateOptions> createOptions)
@@ -468,9 +553,9 @@ public class SmbjApi {
 
         //TODO Even with DELETE_CHILD permission, receiving error, so doing the recursive way for now.
         //if (recursive) accessMask.add(SMB2DirectoryAccessMask.FILE_DELETE_CHILD);
-        if (recursive)  {
-            List<SMB2QueryDirectoryResponse.FileInfo> list = list(scs, path);
-            for (SMB2QueryDirectoryResponse.FileInfo fi: list) {
+        if (recursive) {
+            List<FileInfo> list = list(scs, path);
+            for (FileInfo fi : list) {
                 if (!EnumWithValue.EnumUtils.isSet(fi.getFileAttributes(), FileAttributes.FILE_ATTRIBUTE_DIRECTORY)) {
                     rm(scs, path + "/" + fi.getFileName());
                 } else {
@@ -536,7 +621,7 @@ public class SmbjApi {
         for (SMB2Packet packet : smb2Packets) {
             if (packet.getHeader().getStatus() != SMB2StatusCode.STATUS_SUCCESS) {
                 throw new SmbApiException(packet.getHeader().getStatus(), packet.getHeader().getStatusCode(),
-                        packet.getHeader().getMessage() + " failed for path "  + path, null);
+                        packet.getHeader().getMessage() + " failed for path " + path, null);
             }
         }
     }

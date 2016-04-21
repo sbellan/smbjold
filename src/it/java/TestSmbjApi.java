@@ -1,3 +1,24 @@
+/*
+ * Copyright (C)2016 - SMBJ Contributors
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+import com.hierynomus.msdtyp.SecurityDescriptor;
+import com.hierynomus.msdtyp.SecurityInformation;
+import com.hierynomus.msfscc.FileAttributes;
+import com.hierynomus.msfscc.fileinformation.FileInfo;
+import com.hierynomus.protocol.commons.EnumWithValue;
 import com.hierynomus.smbj.Config;
 import com.hierynomus.smbj.DefaultConfig;
 import com.hierynomus.smbj.api.ShareConnectionSync;
@@ -21,11 +42,14 @@ import java.net.URISyntaxException;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.util.Arrays;
+import java.util.EnumSet;
 import java.util.List;
 import java.util.UUID;
 
 import static org.junit.Assert.assertArrayEquals;
+import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
@@ -54,6 +78,26 @@ public class TestSmbjApi {
         }
         ci = SmbCommandLine.getConnectInfo(url);
         System.out.printf("%s-%s-%s-%s-%s\n", ci.host, ci.domain, ci.user, ci.password, ci.sharePath);
+    }
+
+    @Test
+    public void testTemp() throws IOException, SmbApiException, URISyntaxException {
+        ShareConnectionSync scs = SmbjApi.connect(
+                getConfig(ci.useOffsetForEmptyNames), ci.host, ci.user, ci.password, ci.domain, ci.sharePath);
+
+        try {
+            FileInfo fileInformation = SmbjApi.getFileInformation(scs, "1/cisco.dmg");
+            System.out.println(fileInformation);
+
+            SecurityDescriptor sd = SmbjApi.getSecurityInfo(scs, "2", EnumSet.of(SecurityInformation
+                    .OWNER_SECURITY_INFORMATION,
+                    SecurityInformation.GROUP_SECURITY_INFORMATION,
+                    SecurityInformation.DACL_SECURITY_INFORMATION));
+            System.out.println(sd);
+
+        } finally {
+            SmbjApi.disconnect(scs);
+        }
     }
 
     @Test
@@ -94,6 +138,10 @@ public class TestSmbjApi {
                 }
             }
 
+            FileInfo fileInformation = SmbjApi.getFileInformation(scs, TEST_PATH + "/4/2");
+            assertTrue(EnumWithValue.EnumUtils.isSet(
+                    fileInformation.getFileAttributes(), FileAttributes.FILE_ATTRIBUTE_DIRECTORY));
+
             assertFilesInPathEquals(scs, new String[]{"1", "2", "3", "4"}, TEST_PATH);
 
             // Delete folder (Non recursive)
@@ -113,6 +161,10 @@ public class TestSmbjApi {
             write(scs, TEST_PATH + "/1/2/3/" + file3, "testfiles/large.pdf");
 
             assertFilesInPathEquals(scs, new String[]{file2, file3, "4"}, TEST_PATH + "/1/2/3");
+
+            fileInformation = SmbjApi.getFileInformation(scs, TEST_PATH + "/1/2/3/" + file3);
+            assertTrue(!EnumWithValue.EnumUtils.isSet(
+                    fileInformation.getFileAttributes(), FileAttributes.FILE_ATTRIBUTE_DIRECTORY));
 
             try {
                 SmbjApi.folderExists(scs, TEST_PATH + "/1/2/3/" + file2);
@@ -135,6 +187,19 @@ public class TestSmbjApi {
             }
             assertFileContent("testfiles/medium.txt", tmpFile1.getAbsolutePath());
 
+            SecurityDescriptor sd = SmbjApi.getSecurityInfo(scs, TEST_PATH + "/1/" + file1, EnumSet.of(SecurityInformation
+                            .OWNER_SECURITY_INFORMATION,
+                    SecurityInformation.GROUP_SECURITY_INFORMATION,
+                    SecurityInformation.DACL_SECURITY_INFORMATION));
+            assertEquals(sd.getControl(), EnumSet.of(SecurityDescriptor.Control.PS, SecurityDescriptor.Control.DD,
+                    SecurityDescriptor.Control.OD));
+            assertNotNull(sd.getOwnerSid());
+            assertNotNull(sd.getGroupSid());
+            assertNotNull(sd.getDacl());
+            assertNotNull(sd.getDacl().getAceCount() == sd.getDacl().getAces().length);
+
+            System.out.println(sd);
+
             // Clean up
             SmbjApi.rmdir(scs, TEST_PATH, true);
             assertFalse(SmbjApi.folderExists(scs, TEST_PATH));
@@ -154,17 +219,17 @@ public class TestSmbjApi {
 
     private void assertFilesInPathEquals(ShareConnectionSync scs, String[] expected, String path)
             throws SmbApiException, TransportException {
-        List<SMB2QueryDirectoryResponse.FileInfo> list = SmbjApi.list(scs, path);
+        List<FileInfo> list = SmbjApi.list(scs, path);
         String names[] = getNames(list);
         Arrays.sort(expected);
         Arrays.sort(names);
         assertArrayEquals(expected, names);
     }
 
-    private String[] getNames(List<SMB2QueryDirectoryResponse.FileInfo> list) {
+    private String[] getNames(List<FileInfo> list) {
         String[] names = new String[list.size()];
         int idx = 0;
-        for (SMB2QueryDirectoryResponse.FileInfo fi : list) {
+        for (FileInfo fi : list) {
             names[idx++] = fi.getFileName();
         }
         return names;
