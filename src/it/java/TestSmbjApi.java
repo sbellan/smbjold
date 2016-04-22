@@ -78,7 +78,7 @@ public class TestSmbjApi {
 
     static SmbCommandLine.ConnectInfo ci;
 
-    String TEST_PATH = PathUtils.fix("DEV/junit_testsmbjapi");
+    String TEST_PATH = PathUtils.fix("junit_testsmbjapi");
 
     @BeforeClass
     public static void setup() throws IOException {
@@ -93,8 +93,7 @@ public class TestSmbjApi {
     @Test
     public void testTemp() throws IOException, SmbApiException, URISyntaxException {
         logger.info("Connect {},{},{},{}", ci.host, ci.user, ci.domain, ci.sharePath);
-        Config config = getConfig(ci.useOffsetForEmptyNames);
-        SMBClient client = new SMBClient(config);
+        SMBClient client = new SMBClient();
         Connection connection = client.connect(ci.host);
         AuthenticationContext ac = new AuthenticationContext(
                 ci.user,
@@ -126,8 +125,7 @@ public class TestSmbjApi {
     public void testFull() throws IOException, SmbApiException, URISyntaxException {
 
         logger.info("Connect {},{},{},{}", ci.host, ci.user, ci.domain, ci.sharePath);
-        Config config = getConfig(ci.useOffsetForEmptyNames);
-        SMBClient client = new SMBClient(config);
+        SMBClient client = new SMBClient();
         Connection connection = client.connect(ci.host);
         AuthenticationContext ac = new AuthenticationContext(
                 ci.user,
@@ -145,6 +143,7 @@ public class TestSmbjApi {
                     throw sae;
                 }
             }
+
             // Create it again
             SMB2File.mkdir(smbTreeConnect, PathUtils.fix(TEST_PATH));
             SMB2File.mkdir(smbTreeConnect, PathUtils.fix(TEST_PATH + "/1"));
@@ -222,7 +221,7 @@ public class TestSmbjApi {
             assertFileContent("testfiles/medium.txt", tmpFile1.getAbsolutePath());
 
             SecurityDescriptor sd = SMB2File.getSecurityInfo(smbTreeConnect, PathUtils.fix(TEST_PATH + "/1/" +
-                    file1),
+                            file1),
                     EnumSet.of
                             (SecurityInformation
                                             .OWNER_SECURITY_INFORMATION,
@@ -241,6 +240,9 @@ public class TestSmbjApi {
             SMB2File.rmdir(smbTreeConnect, PathUtils.fix(TEST_PATH), true);
             assertFalse(SMB2File.folderExists(smbTreeConnect, PathUtils.fix(TEST_PATH)));
 
+            // Listing of the root directory.
+            List<FileInfo> list = SMB2File.list(smbTreeConnect, null);
+            assertTrue(list.size() > 0);
         } finally {
             smbTreeConnect.closeSilently();
             session.closeSilently();
@@ -278,14 +280,5 @@ public class TestSmbjApi {
         try (InputStream is = this.getClass().getResourceAsStream(localResource)) {
             SMB2File.write(treeConnect, remotePath, true, is);
         }
-    }
-
-    private Config getConfig(final boolean useOffsetForEmptyNames) {
-        return new DefaultConfig() {
-            @Override
-            public boolean isUseOffsetForEmptyNames() {
-                return useOffsetForEmptyNames;
-            }
-        };
     }
 }

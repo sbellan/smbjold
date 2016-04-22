@@ -44,10 +44,8 @@ public class SMB2CreateRequest extends SMB2Packet {
     private final EnumSet<SMB2CreateOptions> createOptions;
     private final String fileName; // Null to indicate the root of share
     private final long accessMask;
-    private final Config config; // TODO move to SMB2Packet
 
     public SMB2CreateRequest(SMB2Dialect smbDialect,
-                             Config config,
                              long sessionId, long treeId,
                              long accessMask,
                              EnumSet<FileAttributes> fileAttributes,
@@ -55,7 +53,6 @@ public class SMB2CreateRequest extends SMB2Packet {
                              EnumSet<SMB2CreateOptions> createOptions, String fileName) {
 
         super(smbDialect, SMB2MessageCommandCode.SMB2_CREATE);
-        this.config = config;
         getHeader().setSessionId(sessionId);
         getHeader().setTreeId(treeId);
         this.dialect = smbDialect;
@@ -87,7 +84,6 @@ public class SMB2CreateRequest extends SMB2Packet {
         int offset = SMB2Header.STRUCTURE_SIZE + 56;
         byte[] nameBytes = new byte[0];
         if (fileName == null || fileName.trim().length() == 0) {
-            if (!config.isUseOffsetForEmptyNames()) offset = 0;
             buffer.putUInt32(offset); // Name Offset
             buffer.putUInt32(0); // Name Length
         } else {

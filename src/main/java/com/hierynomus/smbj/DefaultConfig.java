@@ -24,9 +24,4 @@ public class DefaultConfig implements Config {
     public EnumSet<SMB2Dialect> getSupportedDialects() {
         return EnumSet.of(SMB2Dialect.SMB_2_0_2);
     }
-
-    @Override
-    public boolean isUseOffsetForEmptyNames() {
-        return false;
-    }
 }

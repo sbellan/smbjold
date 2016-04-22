@@ -23,11 +23,4 @@ public interface Config {
 
     EnumSet<SMB2Dialect> getSupportedDialects();
 
-    /**
-     * For CREATE REQUEST for null/empty name (which mean root)
-     * Samba fail if Name offset is set, but Windows SMB
-     * fails if Name offset is not set;
-     * @return
-     */
-    boolean isUseOffsetForEmptyNames();
 }

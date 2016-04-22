@@ -64,7 +64,6 @@ public class SmbCommandLine {
         public String user = null;
         public String password = null;
         public String sharePath = null;
-        public boolean useOffsetForEmptyNames = false;
     }
 
     public static ConnectInfo getConnectInfo(String url) throws MalformedURLException, UnsupportedEncodingException {
@@ -102,8 +101,7 @@ public class SmbCommandLine {
 
             logger.info("%s-%s-%s-%s-%s\n", ci.host, ci.domain, ci.user, ci.password, ci.sharePath);
 
-            Config config = getConfig(ci.useOffsetForEmptyNames);
-            SMBClient client = new SMBClient(config);
+            SMBClient client = new SMBClient();
             Connection connection = client.connect(ci.host);
             AuthenticationContext ac = new AuthenticationContext(
                     ci.user,
@@ -243,14 +241,4 @@ public class SmbCommandLine {
             SMB2File.read(treeConnect, remotePath, os);
         }
     }
-
-    private Config getConfig(final boolean useOffsetForEmptyNames) {
-        return new DefaultConfig() {
-            @Override
-            public boolean isUseOffsetForEmptyNames() {
-                return useOffsetForEmptyNames;
-            }
-        };
-    }
-
 }

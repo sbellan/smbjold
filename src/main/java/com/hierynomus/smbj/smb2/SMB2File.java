@@ -626,7 +626,6 @@ public class SMB2File {
 
         SMB2CreateRequest cr = new SMB2CreateRequest(
                 connection.getNegotiatedDialect(),
-                connection.getConfig(),
                 session.getSessionId(), treeConnect.getTreeId(),
                 accessMask,
                 fileAttributes,
