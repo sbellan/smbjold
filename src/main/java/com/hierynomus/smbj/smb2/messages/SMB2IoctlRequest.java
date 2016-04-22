@@ -42,14 +42,15 @@ public class SMB2IoctlRequest extends SMB2Packet {
             ControlCode controlCode, SMB2FileId fileId,
             byte[] inputData, boolean fsctl,
             FileInformationClass fileInfoClass,
-            SecurityInformation securityInformation, byte[] buffer
+            SecurityInformation securityInformation
     ) {
         super(negotiatedDialect, SMB2MessageCommandCode.SMB2_IOCTL);
         getHeader().setSessionId(sessionId);
         getHeader().setTreeId(treeId);
+        getHeader().setCreditCost(2);
         this.controlCode = controlCode;
         this.fileId = fileId;
-        this.inputData = inputData == null ? new byte[0] : buffer;
+        this.inputData = inputData == null ? new byte[0] : inputData;
         this.fsctl = fsctl;
     }
 
@@ -71,6 +72,9 @@ public class SMB2IoctlRequest extends SMB2Packet {
             smbBuffer.putUInt32(0); // InputOffset (4 bytes)
             smbBuffer.putUInt32(0); // Input Count (4 bytes)
         }
+        smbBuffer.putUInt32(0); // MaxInputResponse (4 bytes)
+        smbBuffer.putUInt32(0); // OutputOffset (4 bytes)
+        smbBuffer.putUInt32(0); // OutputCount (4 bytes)
         smbBuffer.putUInt32(MAX_OUTPUT_BUFFER_LENGTH); // MaxOutputResponse (4 bytes)
         if (fsctl) smbBuffer.putUInt32(1);
         else smbBuffer.putUInt32(0); // Flags (4 bytes)

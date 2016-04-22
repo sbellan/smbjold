@@ -77,7 +77,6 @@ public class SMB2Header {
     private void writeCreditCharge(SMBBuffer buffer) {
         switch (dialect) {
             case UNKNOWN:
-            case SMB_2_0_2:
                 buffer.putReserved(2);
                 break;
             default:

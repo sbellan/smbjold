@@ -83,6 +83,9 @@ public class SMB2ResponseMessageFactory {
                 case SMB2_QUERY_INFO: // SET_INFO
                     packet = new SMB2QueryInfoResponse().read(buffer);
                     break;
+                case SMB2_IOCTL: // IOCTL
+                    packet = new SMB2IoctlResponse().read(buffer);
+                    break;
                 default:
                     throw new TransportException("Unknown SMB2 Message Command type: " + command);
 

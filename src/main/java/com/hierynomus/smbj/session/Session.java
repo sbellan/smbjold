@@ -58,7 +58,7 @@ public class Session {
     }
 
     public SMBTreeConnect treeConnect(String host, String smbPath) throws TransportException, SmbApiException {
-        String sharePath = "\\\\" + host + smbPath;
+        String sharePath = "\\\\" + host + ((smbPath.charAt(0) == '\\') ? "" : '\\') + smbPath;
         SMB2TreeConnectRequest tr = new SMB2TreeConnectRequest(connection.getNegotiatedDialect(), sharePath);
         tr.getHeader().setSessionId(sessionId);
         tr.getHeader().setCreditRequest(256);

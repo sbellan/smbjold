@@ -48,9 +48,6 @@ public class SMB2IoctlResponse extends SMB2Packet {
         controlCode = EnumWithValue.EnumUtils.valueOf(buffer.readUInt32(), SMB2IoctlRequest.ControlCode.class, null);
         fileId = SMB2FileId.read(buffer);
 
-        int outputBufferOffset = buffer.readUInt16(); // Buffer Offset
-        long outBufferLength = buffer.readUInt32(); // Buffer length
-        outputBuffer = buffer.readRawBytes((int)outBufferLength); // FileId (16 bytes)
         int inputOffset = buffer.readUInt32AsInt(); // Input Offset (4 bytes)
         int inputCount  = buffer.readUInt32AsInt(); // Input Count (4 bytes)
         int outputOffset = buffer.readUInt32AsInt(); // Input Offset (4 bytes)
