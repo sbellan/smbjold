@@ -18,15 +18,22 @@ package com.hierynomus.smbj.api;
 import com.hierynomus.msfscc.fileinformation.FileInfo;
 import com.hierynomus.smbj.Config;
 import com.hierynomus.smbj.DefaultConfig;
+import com.hierynomus.smbj.SMBClient;
+import com.hierynomus.smbj.auth.AuthenticationContext;
+import com.hierynomus.smbj.common.SMBTreeConnect;
 import com.hierynomus.smbj.common.SmbHandler;
+import com.hierynomus.smbj.connection.Connection;
+import com.hierynomus.smbj.session.Session;
 import com.hierynomus.smbj.smb2.SMB2CreateDisposition;
 import com.hierynomus.smbj.smb2.SMB2CreateOptions;
 import com.hierynomus.smbj.smb2.SMB2DirectoryAccessMask;
-import com.hierynomus.smbj.smb2.SMB2FileId;
+import com.hierynomus.smbj.smb2.SMB2File;
 import com.hierynomus.smbj.smb2.SMB2ShareAccess;
 import com.hierynomus.smbj.smb2.messages.SMB2ChangeNotifyResponse;
-import com.hierynomus.smbj.smb2.messages.SMB2QueryDirectoryResponse;
 import com.hierynomus.smbj.transport.TransportException;
+import com.hierynomus.utils.PathUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
@@ -43,6 +50,8 @@ import java.util.List;
 import java.util.Map;
 
 public class SmbCommandLine {
+
+    private static final Logger logger = LoggerFactory.getLogger(SmbCommandLine.class);
 
     public static void main(String[] args) throws IOException, SmbApiException {
         SmbCommandLine scl = new SmbCommandLine();
@@ -63,7 +72,7 @@ public class SmbCommandLine {
 
         ConnectInfo ci = new ConnectInfo();
         ci.host = smbUrl.getHost();
-        ci.sharePath = smbUrl.getPath();
+        ci.sharePath = PathUtils.fix(smbUrl.getPath());
 
         Map<String, String> queryParams = splitQuery(smbUrl.getQuery());
 
@@ -87,13 +96,21 @@ public class SmbCommandLine {
 
     void doMain(String[] args) throws IOException, SmbApiException {
 
-        ShareConnectionSync scs = null;
+        SMBTreeConnect smbTreeConnect = null;
         try {
             ConnectInfo ci = getConnectInfo(args[0]);
 
-            System.out.printf("%s-%s-%s-%s-%s\n", ci.host, ci.domain, ci.user, ci.password, ci.sharePath);
-            scs = SmbjApi.connect(
-                    getConfig(ci.useOffsetForEmptyNames), ci.host, ci.user, ci.password, ci.domain, ci.sharePath);
+            logger.info("%s-%s-%s-%s-%s\n", ci.host, ci.domain, ci.user, ci.password, ci.sharePath);
+
+            Config config = getConfig(ci.useOffsetForEmptyNames);
+            SMBClient client = new SMBClient(config);
+            Connection connection = client.connect(ci.host);
+            AuthenticationContext ac = new AuthenticationContext(
+                    ci.user,
+                    ci.password == null ? new char[0] : ci.password.toCharArray(),
+                    ci.domain);
+            Session session = connection.authenticate(ac);
+            smbTreeConnect = session.treeConnect(ci.host, ci.sharePath);
 
             String command = args[1].toLowerCase();
             String path = null;
@@ -101,30 +118,30 @@ public class SmbCommandLine {
                 case "ls":
                 case "list":
                     path = args.length > 2 ? args[2] : null;
-                    doList(scs, path);
+                    doList(smbTreeConnect, path);
                     break;
                 case "notify":
                     path = args.length > 2 ? args[2] : null;
-                    doNotify(scs, path);
+                    doNotify(smbTreeConnect, path);
                     break;
                 case "rm":
                     path = args[2];
-                    doDelete(scs, path);
+                    doDelete(smbTreeConnect, path);
                     break;
                 case "rmdir":
                     path = args[2];
                     boolean recursive = args.length > 3 ? Boolean.valueOf(args[3]) : false;
-                    doDeleteDir(scs, path, recursive);
+                    doDeleteDir(smbTreeConnect, path, recursive);
                     break;
                 case "write":
                     String localfile = args[2];
                     String remotePath = args[3];
-                    write(scs, localfile, remotePath);
+                    write(smbTreeConnect, localfile, remotePath);
                     break;
                 case "read":
                     remotePath = args[2];
                     localfile = args[3];
-                    read(scs, remotePath, localfile);
+                    read(smbTreeConnect, remotePath, localfile);
                     break;
                 default:
                     throw new IllegalArgumentException("Unknown command " + command);
@@ -141,7 +158,10 @@ public class SmbCommandLine {
             System.err.println("   write <localfile> <remotepath>");
             System.err.println("   write <remotepath> <localfile>");
         } finally {
-            if (scs != null) SmbjApi.disconnect(scs);
+            if (smbTreeConnect != null) {
+                smbTreeConnect.closeSilently();
+                smbTreeConnect.getSession().closeSilently();
+            }
         }
 
     }
@@ -168,16 +188,16 @@ public class SmbCommandLine {
         return query_pairs;
     }
 
-    public void doList(ShareConnectionSync scs, String path) throws SmbApiException, TransportException {
+    public void doList(SMBTreeConnect treeConnect, String path) throws SmbApiException, TransportException {
 
-        List<FileInfo> list = SmbjApi.list(scs, path);
+        List<FileInfo> list = SMB2File.list(treeConnect, path);
         FileInfo.printList(list);
     }
 
-    public void doNotify(final ShareConnectionSync scs, String path) throws SmbApiException, TransportException {
+    public void doNotify(final SMBTreeConnect treeConnect, String path) throws SmbApiException, TransportException {
 
-        final SMB2FileId smb2FileId =
-                SmbjApi.openDirectory(scs, path,
+        final SMB2File fileHandle =
+                SMB2File.openDirectory(treeConnect, path,
                         EnumSet.of(SMB2DirectoryAccessMask.FILE_LIST_DIRECTORY, SMB2DirectoryAccessMask
                                 .FILE_READ_ATTRIBUTES),
                         EnumSet.of(SMB2ShareAccess.FILE_SHARE_DELETE, SMB2ShareAccess.FILE_SHARE_WRITE,
@@ -191,41 +211,36 @@ public class SmbCommandLine {
             @Override
             public void run() {
                 currentThread.interrupt();
-                try {
-                    SmbjApi.close(scs, smb2FileId);
-                } catch (Exception ignore) {
-                }
-                try {
-                    SmbjApi.disconnect(scs);
-                } catch (Exception ignore) {
-                }
+                fileHandle.closeSilently();
+                treeConnect.closeSilently();
+                treeConnect.getSession().closeSilently();
             }
         });
         while (true) {
-            List<SMB2ChangeNotifyResponse.FileNotifyInfo> notify = SmbjApi.notify(scs, smb2FileId);
+            List<SMB2ChangeNotifyResponse.FileNotifyInfo> notify = SMB2File.notify(treeConnect, fileHandle);
             System.out.println(notify.toString());
         }
     }
 
-    public void doDelete(ShareConnectionSync scs, String path) throws SmbApiException, TransportException {
-        SmbjApi.rm(scs, path);
+    public void doDelete(SMBTreeConnect treeConnect, String path) throws SmbApiException, TransportException {
+        SMB2File.rm(treeConnect, path);
     }
 
-    private void doDeleteDir(ShareConnectionSync scs, String path, boolean recursive) throws SmbApiException,
+    private void doDeleteDir(SMBTreeConnect treeConnect, String path, boolean recursive) throws SmbApiException,
             TransportException {
-        SmbjApi.rmdir(scs, path, recursive);
+        SMB2File.rmdir(treeConnect, path, recursive);
     }
 
 
-    public void write(ShareConnectionSync scs, String localFile, String remotePath) throws Exception {
+    public void write(SMBTreeConnect treeConnect, String localFile, String remotePath) throws Exception {
         try (InputStream is = new FileInputStream(localFile)) {
-            SmbjApi.write(scs, remotePath, true, is);
+            SMB2File.write(treeConnect, remotePath, true, is);
         }
     }
 
-    public void read(ShareConnectionSync scs, String remotePath, String localFile) throws Exception {
+    public void read(SMBTreeConnect treeConnect, String remotePath, String localFile) throws Exception {
         try (OutputStream os = new FileOutputStream(localFile)) {
-            SmbjApi.read(scs, remotePath, os);
+            SMB2File.read(treeConnect, remotePath, os);
         }
     }
 

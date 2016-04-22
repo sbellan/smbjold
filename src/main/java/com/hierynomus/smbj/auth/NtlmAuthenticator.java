@@ -26,6 +26,7 @@ import com.hierynomus.protocol.commons.ByteArrayUtils;
 import com.hierynomus.protocol.commons.buffer.Buffer;
 import com.hierynomus.protocol.commons.buffer.Endian;
 import com.hierynomus.smbj.connection.Connection;
+import com.hierynomus.smbj.session.Session;
 import com.hierynomus.smbj.smb2.SMB2Packet;
 import com.hierynomus.smbj.smb2.SMB2StatusCode;
 import com.hierynomus.smbj.smb2.messages.SMB2SessionSetup;
@@ -62,7 +63,7 @@ public class NtlmAuthenticator implements Authenticator {
         }
     }
 
-    public long authenticate(Connection connection, AuthenticationContext context) throws TransportException {
+    public Session authenticate(Connection connection, AuthenticationContext context) throws TransportException {
         try {
             logger.info("Authenticating {} on {} using NTLM", context.getUsername(), connection.getRemoteHostname());
             EnumSet<SMB2SessionSetup.SMB2SecurityMode> signingEnabled = EnumSet.of
@@ -129,7 +130,7 @@ public class NtlmAuthenticator implements Authenticator {
                     throw new NtlmException("Setup failed with " + setupResponse.getHeader().getStatus());
                 }
             }
-            return sessionId;
+            return new Session(connection, sessionId);
         } catch (IOException | Buffer.BufferException e) {
             throw new TransportException(e);
         }

@@ -113,8 +113,8 @@ public class Connection extends SocketClient implements AutoCloseable {
             NegTokenInit negTokenInit = new NegTokenInit().read(connectionInfo.getGssNegotiateToken());
             if (negTokenInit.getSupportedMechTypes().contains(new ASN1ObjectIdentifier(factory.getName()))) {
                 NtlmAuthenticator ntlmAuthenticator = factory.create();
-                long sessionId = ntlmAuthenticator.authenticate(this, authContext);
-                return new Session(sessionId);
+                Session session = ntlmAuthenticator.authenticate(this, authContext);
+                return session;
             }
         } catch (IOException e) {
             throw new SMBRuntimeException(e);
