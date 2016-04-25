@@ -61,7 +61,7 @@ public class Session {
         String sharePath = "\\\\" + host + ((smbPath.charAt(0) == '\\') ? "" : '\\') + smbPath;
         SMB2TreeConnectRequest tr = new SMB2TreeConnectRequest(connection.getNegotiatedDialect(), sharePath);
         tr.getHeader().setSessionId(sessionId);
-        tr.getHeader().setCreditRequest(256);
+        tr.getHeader().setCreditRequest(1);
         connection.send(tr);
 
         SMB2TreeConnectResponse receive = (SMB2TreeConnectResponse) connection.receive().get(0);

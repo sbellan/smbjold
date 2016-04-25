@@ -77,4 +77,20 @@ public class SID {
 
         return ret;
     }
+
+    public byte getRevision() {
+        return revision;
+    }
+
+    public int getSubAuthorityCount() {
+        return subAuthorityCount;
+    }
+
+    public byte[] getSidIdentifierAuthority() {
+        return sidIdentifierAuthority;
+    }
+
+    public long[] getSubAuthorities() {
+        return subAuthorities;
+    }
 }

@@ -24,11 +24,15 @@ import com.hierynomus.smbj.smb2.SMB2FileId;
 import com.hierynomus.smbj.smb2.SMB2Header;
 import com.hierynomus.smbj.smb2.SMB2MessageCommandCode;
 import com.hierynomus.smbj.smb2.SMB2Packet;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * [MS-SMB2].pdf 2.2.31 SMB2 IOCTL Request
  */
 public class SMB2IoctlRequest extends SMB2Packet {
+
+    private static final Logger logger = LoggerFactory.getLogger(SMB2IoctlRequest.class);
 
     long MAX_OUTPUT_BUFFER_LENGTH = 64 * 1024;
 
@@ -75,7 +79,12 @@ public class SMB2IoctlRequest extends SMB2Packet {
         smbBuffer.putUInt32(0); // MaxInputResponse (4 bytes)
         smbBuffer.putUInt32(0); // OutputOffset (4 bytes)
         smbBuffer.putUInt32(0); // OutputCount (4 bytes)
-        smbBuffer.putUInt32(MAX_OUTPUT_BUFFER_LENGTH); // MaxOutputResponse (4 bytes)
+        // TODO 3.3.5.15 Receiving an SMB2 IOCTL Request
+        // Spent days on the INVALID_PARAMETER error which turns out
+        // due to the validation specified in the above section, but not sure which one.
+        // If dialect is 3.x then setting to MAX_OUTPUT_BUFFER_LENGTH works else it fails with INVALID_PARAMETER
+        // To make it work in 2.0.2, subtract the (inputdata length + 8).
+        smbBuffer.putUInt32(MAX_OUTPUT_BUFFER_LENGTH - (inputData.length + 8)); // MaxOutputResponse (4 bytes)
         if (fsctl) smbBuffer.putUInt32(1);
         else smbBuffer.putUInt32(0); // Flags (4 bytes)
         smbBuffer.putUInt32(0); // Reserved (4 bytes)

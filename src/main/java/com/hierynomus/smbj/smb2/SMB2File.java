@@ -133,6 +133,7 @@ public class SMB2File {
 
 
         while ((numRead = srcStream.read(buf)) != -1) {
+            //logger.debug("Writing {} bytes", numRead);
             SMB2WriteRequest wreq = new SMB2WriteRequest(connection.getNegotiatedDialect(), getFileId(),
                     session.getSessionId(), getTreeConnect().getTreeId(),
                     buf, numRead, offset, 0);
@@ -258,7 +259,7 @@ public class SMB2File {
         logger.info("List {}", path);
 
         SMB2File fileHandle = openDirectory(treeConnect, path,
-                EnumSet.of(SMB2DirectoryAccessMask.FILE_LIST_DIRECTORY, SMB2DirectoryAccessMask.FILE_READ_ATTRIBUTES),
+                EnumSet.of(SMB2DirectoryAccessMask.GENERIC_READ),
                 EnumSet.of(SMB2ShareAccess.FILE_SHARE_DELETE, SMB2ShareAccess.FILE_SHARE_WRITE, SMB2ShareAccess
                         .FILE_SHARE_READ),
                 SMB2CreateDisposition.FILE_OPEN,
@@ -603,6 +604,7 @@ public class SMB2File {
                 treeConnect, path, accessMask, shareAccess, fileAttributes, createDisposition, createOptions);
         connection.send(cr);
         SMB2CreateResponse cresponse = (SMB2CreateResponse) connection.receive().get(0);
+        // TODO handle status pending
         if (cresponse.getHeader().getStatus() != SMB2StatusCode.STATUS_SUCCESS) {
             throw new SmbApiException(cresponse.getHeader().getStatus(), cresponse.getHeader().getStatusCode(),
                     "Create failed for " + path, null);
@@ -632,6 +634,8 @@ public class SMB2File {
                 shareAccess,
                 createDisposition,
                 createOptions, path);
+        cr.getHeader().setCreditRequest(256);
+        cr.getHeader().setCreditCost(1);
 
         return cr;
     }

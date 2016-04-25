@@ -23,6 +23,7 @@ import com.hierynomus.smbj.smb2.SMB2Dialect;
 import com.hierynomus.smbj.smb2.SMB2Header;
 import com.hierynomus.smbj.smb2.SMB2MessageCommandCode;
 import com.hierynomus.smbj.smb2.SMB2Packet;
+import com.hierynomus.smbj.smb2.SMB2StatusCode;
 
 import java.util.EnumSet;
 
@@ -68,7 +69,11 @@ public class SMB2SessionSetup extends SMB2Packet {
                 buffer.readUInt16(), SMB2SessionFlags.class); // SessionFlags (2 bytes)
         int securityBufferOffset = buffer.readUInt16(); // SecurityBufferOffset (2 bytes)
         int securityBufferLength = buffer.readUInt16(); // SecurityBufferLength (2 bytes)
-        securityBuffer = readSecurityBuffer(buffer, securityBufferOffset, securityBufferLength); // SecurityBuffer (variable)
+        if (getHeader().getStatus() == SMB2StatusCode.STATUS_SUCCESS ||
+                getHeader().getStatus() == SMB2StatusCode.STATUS_MORE_PROCESSING_REQUIRED) {
+            securityBuffer = readSecurityBuffer(buffer, securityBufferOffset, securityBufferLength); // SecurityBuffer (variable)
+
+        }
     }
 
     private byte[] readSecurityBuffer(SMBBuffer buffer, int securityBufferOffset, int securityBufferLength) throws Buffer.BufferException {

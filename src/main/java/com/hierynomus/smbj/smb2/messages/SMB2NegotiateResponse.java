@@ -21,6 +21,7 @@ import com.hierynomus.smbj.common.SMBBuffer;
 import com.hierynomus.smbj.smb2.SMB2Dialect;
 import com.hierynomus.smbj.smb2.SMB2Packet;
 
+import java.util.Arrays;
 import java.util.Date;
 import java.util.UUID;
 
@@ -132,5 +133,22 @@ public class SMB2NegotiateResponse extends SMB2Packet {
 
     public int getMaxWriteSize() {
         return maxWriteSize;
+    }
+
+
+    @Override
+    public String toString() {
+        return "SMB2NegotiateResponse{" +
+                "securityMode=" + securityMode +
+                ", dialect=" + dialect +
+                ", serverGuid=" + serverGuid +
+                ", capabilities=" + capabilities +
+                ", maxTransactSize=" + maxTransactSize +
+                ", maxReadSize=" + maxReadSize +
+                ", maxWriteSize=" + maxWriteSize +
+                ", systemTime=" + systemTime +
+                ", serverStartTime=" + serverStartTime +
+                ", gssToken=" + Arrays.toString(gssToken) +
+                '}';
     }
 }

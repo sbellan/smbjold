@@ -15,6 +15,7 @@
  */
 package com.hierynomus.smbj.smb2.messages;
 
+import com.hierynomus.msdtyp.MsDataTypes;
 import com.hierynomus.msfscc.FileAttributes;
 import com.hierynomus.ntlm.functions.NtlmFunctions;
 import com.hierynomus.smbj.Config;
@@ -44,6 +45,7 @@ public class SMB2CreateRequest extends SMB2Packet {
     private final EnumSet<SMB2CreateOptions> createOptions;
     private final String fileName; // Null to indicate the root of share
     private final long accessMask;
+    private boolean createMaximalAccessRequest;
 
     public SMB2CreateRequest(SMB2Dialect smbDialect,
                              long sessionId, long treeId,
@@ -65,6 +67,7 @@ public class SMB2CreateRequest extends SMB2Packet {
         this.createOptions =
                 createOptions == null ? EnumSet.noneOf(SMB2CreateOptions.class) : createOptions;
         this.fileName = fileName;
+        createMaximalAccessRequest = false;
 
     }
 
@@ -73,7 +76,7 @@ public class SMB2CreateRequest extends SMB2Packet {
         buffer.putUInt16(57); // StructureSize (2 bytes)
         buffer.putByte((byte) 0); // SecurityFlags (1 byte) - Reserved
         buffer.putByte((byte) 0);  // Req OpLock Level (1 byte) - None
-        buffer.putUInt32(1); // Impersonation Level (4 bytes) - Identification
+        buffer.putUInt32(2); // Impersonation Level (4 bytes) - Identification
         buffer.putReserved(8); // SmbCreateFlags (8 bytes)
         buffer.putReserved(8); // Reserved (8 bytes)
         buffer.putUInt32(accessMask); // Access Mask (4 bytes)
@@ -84,18 +87,44 @@ public class SMB2CreateRequest extends SMB2Packet {
         int offset = SMB2Header.STRUCTURE_SIZE + 56;
         byte[] nameBytes = new byte[0];
         if (fileName == null || fileName.trim().length() == 0) {
-            buffer.putUInt32(offset); // Name Offset
-            buffer.putUInt32(0); // Name Length
+            buffer.putUInt16(offset); // Name Offset
+            buffer.putUInt16(nameBytes.length); // Name Length
+            // For empty names(root directory) Windows requires
+            // us to use a offset and in that offset have atleast a byte, since it affects alignment
+            // set the variable later.
+            nameBytes = new byte[1];
         } else {
             nameBytes = NtlmFunctions.unicode(fileName);
             buffer.putUInt16(offset); // Name Offset
             buffer.putUInt16(nameBytes.length); // Name Length
         }
 
-        // Create Contexts
-        buffer.putUInt32(0); // Offset
-        buffer.putUInt32(0); // Length
+        int alignmentFill = (8 - nameBytes.length % 8) % 8;
+        offset += nameBytes.length + alignmentFill;
 
-        if (nameBytes.length > 0) buffer.putRawBytes(nameBytes);
+        // MS-SMB2 2.2.13.2, 2.2.13.2.5 SMB2_CREATE_QUERY_MAXIMAL_ACCESS_REQUEST
+        if (createMaximalAccessRequest) {
+            buffer.putUInt32(offset); // Offset
+            buffer.putUInt32(32); // Length
+        } else {
+            buffer.putUInt32(0); // Offset
+            buffer.putUInt32(0); // Length
+        }
+
+        buffer.putRawBytes(nameBytes);
+
+        if (createMaximalAccessRequest) {
+            buffer.putRawBytes(new byte[alignmentFill]);
+            buffer.putUInt32(0); // Next - 4
+            buffer.putUInt16(16); // Name Offset
+            buffer.putUInt16(4); // Name Length
+            buffer.putReserved(2); // Reserved
+            buffer.putUInt16(24); // Data offset
+            buffer.putUInt32(8); // Data length
+            buffer.putRawBytes("MxAc".getBytes());
+            buffer.putUInt32(0);
+            buffer.putUInt64(MsDataTypes.nowAsFileTime());
+        }
+
     }
 }

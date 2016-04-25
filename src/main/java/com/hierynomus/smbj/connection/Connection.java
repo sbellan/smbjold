@@ -64,7 +64,7 @@ public class Connection extends SocketClient implements AutoCloseable {
         }
         SMB2NegotiateResponse resp = (SMB2NegotiateResponse) negotiateResponse;
         connectionInfo.negotiated(resp);
-        logger.info("Negotiated dialect: {}", connectionInfo.getDialect());
+        logger.info("Negotiate response: {}", resp);
     }
 
     /**
