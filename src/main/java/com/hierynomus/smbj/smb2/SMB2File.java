@@ -15,6 +15,7 @@
  */
 package com.hierynomus.smbj.smb2;
 
+import com.hierynomus.msdtyp.AccessMask;
 import com.hierynomus.msdtyp.SecurityDescriptor;
 import com.hierynomus.msdtyp.SecurityInformation;
 import com.hierynomus.msfscc.FileAttributes;
@@ -68,13 +69,13 @@ public class SMB2File {
     SMBTreeConnect treeConnect;
     String fileName;
 
-    long accessMask;
+    EnumSet<AccessMask> accessMask; // The Access the current user has on the file.
     EnumSet<SMB2ShareAccess> shareAccess;
     EnumSet<SMB2CreateOptions> createOptions;
     EnumSet<FileAttributes> fileAttributes;
     SMB2CreateDisposition createDisposition;
 
-    public SMB2File(SMB2FileId fileId, SMBTreeConnect treeConnect, String fileName, long accessMask,
+    public SMB2File(SMB2FileId fileId, SMBTreeConnect treeConnect, String fileName, EnumSet<AccessMask> accessMask,
                     EnumSet<SMB2ShareAccess> shareAccess, EnumSet<SMB2CreateOptions> createOptions,
                     EnumSet<FileAttributes> fileAttributes, SMB2CreateDisposition createDisposition) {
         this.fileId = fileId;
@@ -89,6 +90,10 @@ public class SMB2File {
 
     public SMB2FileId getFileId() {
         return fileId;
+    }
+
+    public EnumSet<AccessMask> getAccessMask() {
+        return accessMask;
     }
 
     public SMBTreeConnect getTreeConnect() {
@@ -108,6 +113,7 @@ public class SMB2File {
                 0, null);
         connection.send(qdr);
         SMB2QueryDirectoryResponse qdresp = (SMB2QueryDirectoryResponse) connection.receive().get(0);
+        qdresp = (SMB2QueryDirectoryResponse) connection.waitForCompletion(qdresp);
         if (qdresp.getHeader().getStatus() != SMB2StatusCode.STATUS_SUCCESS) {
             throw new SmbApiException(qdresp.getHeader().getStatus(), qdresp.getHeader().getStatusCode(),
                     "Query directory failed for " + fileName + "/" + fileId, null);
@@ -139,6 +145,7 @@ public class SMB2File {
                     buf, numRead, offset, 0);
             connection.send(wreq);
             SMB2WriteResponse wresp = (SMB2WriteResponse) connection.receive().get(0);
+            wresp = (SMB2WriteResponse) connection.waitForCompletion(wresp);
             if (wresp.getHeader().getStatus() != SMB2StatusCode.STATUS_SUCCESS) {
                 throw new SmbApiException(wresp.getHeader().getStatus(), wresp.getHeader().getStatusCode(),
                         "Write failed for " + this, null);
@@ -189,34 +196,10 @@ public class SMB2File {
         SMB2File fileHandle = openFile(treeConnect, path,
                 EnumSet.of(SMB2DirectoryAccessMask.GENERIC_READ), SMB2CreateDisposition.FILE_OPEN);
 
-        Session session = treeConnect.getSession();
-        Connection connection = session.getConnection();
-
         try {
-            long offset = 0;
-            SMB2ReadRequest rreq = new SMB2ReadRequest(connection.getNegotiatedDialect(), fileHandle.getFileId(),
-                    session.getSessionId(), treeConnect.getTreeId(), offset);
-
-            connection.send(rreq);
-            SMB2ReadResponse rresp = (SMB2ReadResponse) connection.receive().get(0);
-            while (rresp.getHeader().getStatus() == SMB2StatusCode.STATUS_SUCCESS &&
-                    rresp.getHeader().getStatus() != SMB2StatusCode.STATUS_END_OF_FILE) {
-                destStream.write(rresp.getData());
-                offset += rresp.getDataLength();
-                rreq = new SMB2ReadRequest(connection.getNegotiatedDialect(), fileHandle.getFileId(),
-                        session.getSessionId(), treeConnect.getTreeId(), offset);
-                connection.send(rreq);
-                rresp = (SMB2ReadResponse) connection.receive().get(0);
-            }
-
-            if (rresp.getHeader().getStatus() != SMB2StatusCode.STATUS_END_OF_FILE) {
-                throw new SmbApiException(rresp.getHeader().getStatus(), rresp.getHeader().getStatusCode(),
-                        "Read failed for " + path, null);
-            }
-
+            fileHandle.read(destStream);
         } finally {
             fileHandle.close();
-            ;
         }
     }
 
@@ -314,10 +297,8 @@ public class SMB2File {
 
         SMB2ChangeNotifyResponse cnresponse = (SMB2ChangeNotifyResponse) connection.receive().get(0);
         // Wait till we get a permanent response
-        while (cnresponse.getHeader().getStatus() == SMB2StatusCode.STATUS_PENDING
-                && cnresponse.getHeader().getAsyncId() > 0) {
-            cnresponse = (SMB2ChangeNotifyResponse) connection.receive().get(0);
-        }
+        cnresponse = (SMB2ChangeNotifyResponse)connection.waitForCompletion(cnresponse);
+
         if (cnresponse.getHeader().getStatus() != SMB2StatusCode.STATUS_SUCCESS) {
             throw new SmbApiException(cnresponse.getHeader().getStatus(), cnresponse.getHeader().getStatusCode(),
                     "Notify failed for " + fileHandle, null);
@@ -341,6 +322,7 @@ public class SMB2File {
         connection.send(si_req);
 
         SMB2SetInfoResponse receive = (SMB2SetInfoResponse) connection.receive().get(0);
+        receive = (SMB2SetInfoResponse)connection.waitForCompletion(receive);
         if (receive.getHeader().getStatus() != SMB2StatusCode.STATUS_SUCCESS) {
             throw new SmbApiException(receive.getHeader().getStatus(), receive.getHeader().getStatusCode(),
                     "Tree connect request failed for " + this, null);
@@ -354,7 +336,7 @@ public class SMB2File {
                 EnumSet.of(SMB2DirectoryAccessMask.DELETE);
         SMB2CreateRequest smb2CreateRequest =
                 openFileRequest(treeConnect, path, SMB2DirectoryAccessMask.DELETE.getValue(), null, null,
-                        SMB2CreateDisposition.FILE_OPEN, EnumSet.of(SMB2CreateOptions.FILE_NON_DIRECTORY_FILE));
+                        SMB2CreateDisposition.FILE_OPEN, EnumSet.of(SMB2CreateOptions.FILE_NON_DIRECTORY_FILE), false);
 
         deleteCommon(treeConnect, path, smb2CreateRequest);
     }
@@ -384,7 +366,7 @@ public class SMB2File {
                                     SMB2ShareAccess.FILE_SHARE_READ),
                             EnumSet.of(FileAttributes.FILE_ATTRIBUTE_DIRECTORY),
                             SMB2CreateDisposition.FILE_OPEN,
-                            null
+                            null, false
                     );
 
             deleteCommon(treeConnect, path, smb2CreateRequest);
@@ -436,6 +418,30 @@ public class SMB2File {
         return sd;
     }
 
+    public SecurityDescriptor getSecurityInfo(EnumSet<SecurityInformation> securityInfo)
+            throws SmbApiException, TransportException {
+        byte[] outputBuffer = queryInfoCommon (this, SMB2QueryInfoRequest.SMB2QueryInfoType.SMB2_0_INFO_SECURITY, securityInfo,
+                null);
+        SecurityDescriptor sd = new SecurityDescriptor();
+        try {
+            sd.read(new SMBBuffer(outputBuffer));
+        } catch (Buffer.BufferException e) {
+            throw new TransportException(e);
+        }
+        return sd;
+    }
+
+    public FileInfo getFileInformation() throws SmbApiException, TransportException {
+        byte[] outputBuffer = queryInfoCommon (this, SMB2QueryInfoRequest.SMB2QueryInfoType.SMB2_0_INFO_FILE, null,
+                FileInformationClass.FileAllInformation);
+        try {
+            return FileInformationFactory.parseFileAllInformation(
+                    new Buffer.PlainBuffer(outputBuffer, Endian.LE));
+        } catch (Buffer.BufferException e) {
+            throw new TransportException(e);
+        }
+    }
+
     /**
      * @return The FileInformation for the Given Path
      * @throws SmbApiException
@@ -476,20 +482,35 @@ public class SMB2File {
                             SMB2ShareAccess.FILE_SHARE_READ),
                     SMB2CreateDisposition.FILE_OPEN,
                     null);
-            SMB2QueryInfoRequest qreq = new SMB2QueryInfoRequest(
-                    connection.getNegotiatedDialect(), session.getSessionId(), treeConnect.getTreeId(),
-                    fileHandle.getFileId(), infoType,
-                    fileInformationClass, null, null, securityInfo);
-            connection.send(qreq);
-            SMB2QueryInfoResponse qresp = (SMB2QueryInfoResponse) connection.receive().get(0);
-            if (qresp.getHeader().getStatus() != SMB2StatusCode.STATUS_SUCCESS) {
-                throw new SmbApiException(qresp.getHeader().getStatus(), qresp.getHeader().getStatusCode(),
-                        "QUERY_INFO failed for " + path, null);
-            }
-            return qresp.getOutputBuffer();
+            return queryInfoCommon(fileHandle, infoType, securityInfo, fileInformationClass);
         } finally {
             if (fileHandle != null) fileHandle.closeSilently();
         }
+    }
+
+    private static byte[] queryInfoCommon(
+            SMB2File fileHandle,
+            SMB2QueryInfoRequest.SMB2QueryInfoType infoType,
+            EnumSet<SecurityInformation> securityInfo,
+            FileInformationClass fileInformationClass)
+            throws SmbApiException, TransportException {
+
+        SMBTreeConnect treeConnect = fileHandle.getTreeConnect();
+        Session session = treeConnect.getSession();
+        Connection connection = session.getConnection();
+
+        SMB2QueryInfoRequest qreq = new SMB2QueryInfoRequest(
+                connection.getNegotiatedDialect(), session.getSessionId(), treeConnect.getTreeId(),
+                fileHandle.getFileId(), infoType,
+                fileInformationClass, null, null, securityInfo);
+        connection.send(qreq);
+        SMB2QueryInfoResponse qresp = (SMB2QueryInfoResponse) connection.receive().get(0);
+        qresp = (SMB2QueryInfoResponse) connection.waitForCompletion(qresp);
+        if (qresp.getHeader().getStatus() != SMB2StatusCode.STATUS_SUCCESS) {
+            throw new SmbApiException(qresp.getHeader().getStatus(), qresp.getHeader().getStatusCode(),
+                    "QUERY_INFO failed for " + fileHandle, null);
+        }
+        return qresp.getOutputBuffer();
     }
 
     private static boolean exists(SMBTreeConnect treeConnect, String path, EnumSet<SMB2CreateOptions> createOptions)
@@ -562,15 +583,18 @@ public class SMB2File {
         EnumSet<SMB2CreateOptions> createOptions = EnumSet.of(SMB2CreateOptions.FILE_NON_DIRECTORY_FILE);
         SMB2CreateRequest cr = openFileRequest(treeConnect, path, EnumWithValue.EnumUtils.toLong(accessMask),
                 EnumSet.of(SMB2ShareAccess.FILE_SHARE_READ), null, createDisposition,
-                EnumSet.of(SMB2CreateOptions.FILE_NON_DIRECTORY_FILE));
+                EnumSet.of(SMB2CreateOptions.FILE_NON_DIRECTORY_FILE), true);
         connection.send(cr);
         SMB2CreateResponse cresponse = (SMB2CreateResponse) connection.receive().get(0);
+
+        cresponse = (SMB2CreateResponse)connection.waitForCompletion(cresponse);
+
         if (cresponse.getHeader().getStatus() != SMB2StatusCode.STATUS_SUCCESS) {
             throw new SmbApiException(cresponse.getHeader().getStatus(), cresponse.getHeader().getStatusCode(),
                     "Create failed for " + path, null);
         }
         return new SMB2File(
-                cresponse.getFileId(), treeConnect, path, EnumWithValue.EnumUtils.toLong(accessMask), shareAccess,
+                cresponse.getFileId(), treeConnect, path, cresponse.getAccessMasks(), shareAccess,
                 createOptions, null, createDisposition);
     }
 
@@ -601,17 +625,18 @@ public class SMB2File {
         Session session = treeConnect.getSession();
         Connection connection = session.getConnection();
         SMB2CreateRequest cr = openFileRequest(
-                treeConnect, path, accessMask, shareAccess, fileAttributes, createDisposition, createOptions);
+                treeConnect, path, accessMask, shareAccess, fileAttributes, createDisposition, createOptions, true);
         connection.send(cr);
         SMB2CreateResponse cresponse = (SMB2CreateResponse) connection.receive().get(0);
-        // TODO handle status pending
+        cresponse = (SMB2CreateResponse)connection.waitForCompletion(cresponse);
+
         if (cresponse.getHeader().getStatus() != SMB2StatusCode.STATUS_SUCCESS) {
             throw new SmbApiException(cresponse.getHeader().getStatus(), cresponse.getHeader().getStatusCode(),
                     "Create failed for " + path, null);
         }
 
         return new SMB2File(
-                cresponse.getFileId(), treeConnect, path, accessMask, shareAccess,
+                cresponse.getFileId(), treeConnect, path, cresponse.getAccessMasks(), shareAccess,
                 createOptions, fileAttributes, createDisposition);
     }
 
@@ -621,7 +646,8 @@ public class SMB2File {
             EnumSet<SMB2ShareAccess> shareAccess,
             EnumSet<FileAttributes> fileAttributes,
             SMB2CreateDisposition createDisposition,
-            EnumSet<SMB2CreateOptions> createOptions) {
+            EnumSet<SMB2CreateOptions> createOptions,
+            boolean reqMaximalAccess) {
 
         Session session = treeConnect.getSession();
         Connection connection = session.getConnection();
@@ -633,7 +659,7 @@ public class SMB2File {
                 fileAttributes,
                 shareAccess,
                 createDisposition,
-                createOptions, path);
+                createOptions, path, reqMaximalAccess);
         cr.getHeader().setCreditRequest(256);
         cr.getHeader().setCreditCost(1);
 
@@ -647,6 +673,7 @@ public class SMB2File {
                 treeConnect.getSession().getSessionId(), treeConnect.getTreeId());
         connection.send(closeReq);
         SMB2Close closeResp = (SMB2Close) connection.receive().get(0);
+        closeResp = (SMB2Close)connection.waitForCompletion(closeResp);
         if (closeResp.getHeader().getStatus() != SMB2StatusCode.STATUS_SUCCESS) {
             throw new SmbApiException(closeResp.getHeader().getStatus(), closeResp.getHeader().getStatusCode(),
                     "Close failed for " + fileId, null);

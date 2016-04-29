@@ -52,7 +52,7 @@ public class SMB2CreateRequest extends SMB2Packet {
                              long accessMask,
                              EnumSet<FileAttributes> fileAttributes,
                              EnumSet<SMB2ShareAccess> shareAccess, SMB2CreateDisposition createDisposition,
-                             EnumSet<SMB2CreateOptions> createOptions, String fileName) {
+                             EnumSet<SMB2CreateOptions> createOptions, String fileName, boolean createMaximalAccessRequest) {
 
         super(smbDialect, SMB2MessageCommandCode.SMB2_CREATE);
         getHeader().setSessionId(sessionId);
@@ -67,7 +67,7 @@ public class SMB2CreateRequest extends SMB2Packet {
         this.createOptions =
                 createOptions == null ? EnumSet.noneOf(SMB2CreateOptions.class) : createOptions;
         this.fileName = fileName;
-        createMaximalAccessRequest = false;
+        this.createMaximalAccessRequest = createMaximalAccessRequest;
 
     }
 

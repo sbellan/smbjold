@@ -40,18 +40,25 @@ public class SequenceWindow {
     private Semaphore available = new Semaphore(1);
 
     public long get() {
+        return lowestAvailable.getAndIncrement();
+        /*
         if (available.tryAcquire()) {
             return lowestAvailable.getAndIncrement();
         }
         throw new SMBRuntimeException("No more credits available to hand out sequence number");
+        */
     }
 
     public long[] get(int credits) {
+        long lowest = lowestAvailable.getAndAdd(credits);
+        return range(lowest, lowest + credits);
+        /*
         if (available.tryAcquire(credits)) {
             long lowest = lowestAvailable.getAndAdd(credits);
             return range(lowest, lowest + credits);
         }
         throw new SMBRuntimeException("Not enough credits (" + available.availablePermits() + " available) to hand out " + credits + " sequence numbers");
+        */
     }
 
     public void disableCredits() {

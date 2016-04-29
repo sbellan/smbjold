@@ -23,6 +23,8 @@ import com.hierynomus.smbj.common.SMBRuntimeException;
 import com.hierynomus.smbj.session.Session;
 import com.hierynomus.smbj.smb2.SMB2Dialect;
 import com.hierynomus.smbj.smb2.SMB2Packet;
+import com.hierynomus.smbj.smb2.SMB2StatusCode;
+import com.hierynomus.smbj.smb2.messages.SMB2ChangeNotifyResponse;
 import com.hierynomus.smbj.smb2.messages.SMB2NegotiateRequest;
 import com.hierynomus.smbj.smb2.messages.SMB2NegotiateResponse;
 import com.hierynomus.smbj.transport.DirectTcpTransport;
@@ -99,6 +101,15 @@ public class Connection extends SocketClient implements AutoCloseable {
 
     public List<SMB2Packet> receive() throws TransportException {
         return packetReader.readPacket();
+    }
+
+    public SMB2Packet waitForCompletion(SMB2Packet packet) throws TransportException {
+        SMB2Packet completedPacket = packet;
+        while (completedPacket.getHeader().getStatus() == SMB2StatusCode.STATUS_PENDING
+                && completedPacket.getHeader().getAsyncId() > 0) {
+            completedPacket = (SMB2ChangeNotifyResponse) receive().get(0);
+        }
+        return completedPacket;
     }
 
     /**

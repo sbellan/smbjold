@@ -65,6 +65,8 @@ public class Session {
         connection.send(tr);
 
         SMB2TreeConnectResponse receive = (SMB2TreeConnectResponse) connection.receive().get(0);
+        receive = (SMB2TreeConnectResponse) connection.waitForCompletion(receive);
+
         if (receive.getHeader().getStatus() != SMB2StatusCode.STATUS_SUCCESS) {
             throw new SmbApiException(receive.getHeader().getStatus(), receive.getHeader().getStatusCode(),
                     "Tree connect request failed for " + sharePath, null);

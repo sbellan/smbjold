@@ -19,6 +19,9 @@ import com.hierynomus.protocol.commons.ByteArrayUtils;
 import com.hierynomus.protocol.commons.buffer.Buffer;
 import com.hierynomus.smbj.common.SMBBuffer;
 
+import java.util.Arrays;
+import java.util.Objects;
+
 /**
  * [MS-DTYP].pdf 2.4.2 SecurityIdentifier SID
  */
@@ -28,6 +31,16 @@ public class SID {
     int subAuthorityCount;
     byte[] sidIdentifierAuthority;
     long[] subAuthorities;
+
+    public SID() {
+    }
+
+    public SID(byte revision, int subAuthorityCount, byte[] sidIdentifierAuthority, long[] subAuthorities) {
+        this.revision = revision;
+        this.subAuthorityCount = subAuthorityCount;
+        this.sidIdentifierAuthority = sidIdentifierAuthority;
+        this.subAuthorities = subAuthorities;
+    }
 
     public void write(SMBBuffer buffer) {
         buffer.putByte(revision);
@@ -92,5 +105,21 @@ public class SID {
 
     public long[] getSubAuthorities() {
         return subAuthorities;
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (o == null || getClass() != o.getClass()) return false;
+        SID sid = (SID) o;
+        return Objects.equals(revision, sid.revision) &&
+                Objects.equals(subAuthorityCount, sid.subAuthorityCount) &&
+                Arrays.equals(sidIdentifierAuthority, sid.sidIdentifierAuthority) &&
+                Arrays.equals(subAuthorities, sid.subAuthorities);
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(revision, subAuthorityCount, sidIdentifierAuthority, subAuthorities);
     }
 }
